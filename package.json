@@ -1,0 +1,89 @@
+{
+  "name": "cmake-path-resolver",
+  "displayName": "CMake Path Resolver",
+  "description": "Resolve CMake variable paths (${VAR}/path/file.h) with underline decoration, hover tips, and click-to-navigate functionality",
+  "version": "0.0.1",
+  "publisher": "cmake-path-resolver",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:cmake",
+    "workspaceContains:**/CMakeLists.txt"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cmake-path-resolver.resolvePath",
+        "title": "Resolve CMake Path"
+      },
+      {
+        "command": "cmake-path-resolver.refreshVariables",
+        "title": "Refresh CMake Variables"
+      }
+    ],
+    "configuration": {
+      "title": "CMake Path Resolver",
+      "properties": {
+        "cmake-path-resolver.customVariables": {
+          "type": "object",
+          "default": {},
+          "description": "Custom variable mappings (e.g., {\"MY_WORKSPACE_PATH\": \"/path/to/workspace\"})"
+        },
+        "cmake-path-resolver.enabledFileTypes": {
+          "type": "array",
+          "default": [
+            "cmake",
+            "cpp",
+            "c",
+            "h",
+            "hpp"
+          ],
+          "description": "File types where CMake path resolution is enabled"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "cmake",
+        "extensions": [
+          ".cmake"
+        ],
+        "filenames": [
+          "CMakeLists.txt"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./dist/test/runTest.js",
+    "test:unit": "mocha --require ts-node/register 'src/test/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.39.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appledragon/cmake-path-resolver"
+  }
+}
