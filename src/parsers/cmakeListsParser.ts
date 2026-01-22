@@ -20,11 +20,23 @@ export interface CMakeVariableDefinition {
  * Regular expression to match CMake set() commands
  * Handles: set(VAR "value"), set(VAR value), set(VAR "multi word value")
  * Also handles: set(VAR value CACHE STRING "description")
+ * 
+ * Pattern breakdown:
+ * - set\s*\(        : "set" followed by optional whitespace and opening paren
+ * - \s*             : optional whitespace
+ * - ([A-Za-z_]...)  : capture group 1 - variable name (starts with letter/underscore)
+ * - \s+             : required whitespace separator
+ * - (?:"([^"]*)"|   : capture group 2 - quoted value, OR
+ *   ([^\s")]+))     : capture group 3 - unquoted value
+ * - (?:\s+CACHE...)?  : optional CACHE section (non-capturing)
+ * - (?:\s+FORCE)?   : optional FORCE keyword (non-capturing)
+ * - \s*\)           : optional whitespace and closing paren
  */
 const SET_COMMAND_REGEX = /set\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+(?:"([^"]*)"|([^\s")]+))(?:\s+CACHE\s+[A-Z]+\s+"[^"]*")?(?:\s+FORCE)?\s*\)/gi;
 
 /**
  * Alternative regex for multi-line or complex set commands
+ * Simpler pattern that captures everything between variable name and closing paren
  */
 const SET_SIMPLE_REGEX = /set\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+([^)]+)\)/gi;
 

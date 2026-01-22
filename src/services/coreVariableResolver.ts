@@ -8,6 +8,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { CMakeVariableDefinition, parseSetCommands, parseProjectName, parseOptions } from '../parsers';
 
+/**
+ * Maximum recursion depth for nested variable resolution
+ * Prevents infinite loops in case of circular variable references
+ */
+const MAX_VARIABLE_RESOLUTION_DEPTH = 10;
+
 export interface ResolvedPath {
     /** The original path expression */
     original: string;
@@ -133,10 +139,10 @@ export class CoreVariableResolver {
      * Resolve a path expression, substituting all variables
      * Supports nested variables with recursive resolution
      * @param pathExpression The path expression to resolve
-     * @param maxDepth Maximum recursion depth for nested variables
+     * @param maxDepth Maximum recursion depth for nested variables (default: MAX_VARIABLE_RESOLUTION_DEPTH)
      * @returns Resolved path information
      */
-    resolvePath(pathExpression: string, maxDepth = 10): ResolvedPath {
+    resolvePath(pathExpression: string, maxDepth = MAX_VARIABLE_RESOLUTION_DEPTH): ResolvedPath {
         let resolved = pathExpression;
         const unresolvedVariables: string[] = [];
         let depth = 0;
