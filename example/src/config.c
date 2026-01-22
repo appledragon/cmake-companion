@@ -1,9 +1,9 @@
-/* config.c - C语言版本的配置文件 */
+/* config.c - C version configuration file */
 
 #include "config.h"
 #include <stdio.h>
 
-// CMake变量路径示例
+// CMake variable path examples
 // #include "${PROJECT_ROOT}/config.h"
 // #include "${INCLUDE_DIR}/shared.h"
 
@@ -15,7 +15,7 @@ void load_config() {
 }
 
 const char* get_project_root() {
-    // 这个路径会被插件解析
+    // This path will be resolved by the plugin
     // ${PROJECT_ROOT}/src/config.c
     return "${PROJECT_ROOT}";
 }

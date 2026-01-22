@@ -2,26 +2,26 @@
 #include "../include/config.hpp"
 #include <iostream>
 
-// 包含带有CMake变量的路径
-// 这些路径会被插件检测和处理
-// 示例：${PROJECT_ROOT}/include/utils.h
-// 示例：${INCLUDE_DIR}/config.hpp
-// 示例：${SRC_DIR}/main.cpp
+// Paths containing CMake variables
+// These paths will be detected and processed by the plugin
+// Example: ${PROJECT_ROOT}/include/utils.h
+// Example: ${INCLUDE_DIR}/config.hpp
+// Example: ${SRC_DIR}/main.cpp
 
 int main() {
     std::cout << "=== CMake Path Resolver Test ===" << std::endl;
     
-    // 测试工具函数
+    // Test utility function
     utils::printMessage("Hello from example project!");
     
-    // 获取配置路径
+    // Fetch configuration paths
     auto paths = utils::getConfigPaths();
     std::cout << "Config paths:" << std::endl;
     for (const auto& path : paths) {
         std::cout << "  - " << path << std::endl;
     }
     
-    // 输出一些CMake变量路径
+    // Print sample CMake variable paths
     std::cout << "\nCMake variable paths:" << std::endl;
     std::cout << "  - ${PROJECT_ROOT}/CMakeLists.txt" << std::endl;
     std::cout << "  - ${SRC_DIR}/main.cpp" << std::endl;

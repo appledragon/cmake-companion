@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-// CMake变量路径示例 - 插件会识别和链接这些
+// CMake variable path examples - the plugin recognizes and links these
 // ${PROJECT_ROOT}/include/common.hpp
 // ${INCLUDE_DIR}/config.hpp
 // ${THIRD_PARTY}/boost/include/boost.hpp

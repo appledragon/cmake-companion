@@ -1,7 +1,7 @@
 #include "../include/utils.h"
 #include <iostream>
 
-// 使用CMake变量定义的路径
+// Paths defined with CMake variables
 // ${SRC_DIR}/utils.cpp
 // ${INCLUDE_DIR}/utils.h
 // ${BUILD_DIR}/bin/utils.o
