@@ -16,13 +16,12 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 
 - CMakeLists.txt
 - *.cmake files
-- C/C++ files (.c, .cpp, .h, .hpp)
 
 ## Usage
 
 1. Open a workspace containing CMakeLists.txt files
-2. The extension automatically parses all CMake files and extracts variable definitions
-3. In any supported file, CMake variable paths will be underlined
+2. Open a CMake file (CMakeLists.txt or *.cmake) to parse its variable definitions
+3. CMake variable paths will be underlined
 4. Hover over a path to see the resolved value
 5. Ctrl+Click to navigate to the resolved file
 
@@ -52,7 +51,7 @@ Configure which file types should have CMake path resolution enabled:
 
 ```json
 {
-  "cmake-path-resolver.enabledFileTypes": ["cmake", "cpp", "c", "h", "hpp"]
+  "cmake-path-resolver.enabledFileTypes": ["cmake"]
 }
 ```
 
