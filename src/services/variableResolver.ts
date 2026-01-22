@@ -10,12 +10,23 @@ import { CoreVariableResolver } from './coreVariableResolver';
 // Re-export ResolvedPath for convenience
 export { ResolvedPath } from './coreVariableResolver';
 
+const outputChannel = vscode.window.createOutputChannel('CMake Path Resolver');
+
+function logDebug(enabled: boolean, message: string): void {
+    if (!enabled) {
+        return;
+    }
+    const timestamp = new Date().toISOString();
+    outputChannel.appendLine(`[${timestamp}] ${message}`);
+}
+
 /**
  * Variable Resolver Service
  * Handles CMake variable storage, resolution, and built-in variable support
  * with VS Code integration
  */
 export class VariableResolver extends CoreVariableResolver {
+    private debugEnabled = false;
     
     /**
      * Initialize the resolver with VS Code workspace folders
@@ -25,6 +36,8 @@ export class VariableResolver extends CoreVariableResolver {
         const folders = workspaceFolders?.map(f => f.uri.fsPath) || [];
         super.initialize(folders);
         this.loadVSCodeCustomVariables();
+        this.loadVSCodeEnvironmentVariables();
+        logDebug(this.debugEnabled, `Initialized with folders: ${folders.join(', ')}`);
     }
     
     /**
@@ -33,7 +46,19 @@ export class VariableResolver extends CoreVariableResolver {
     private loadVSCodeCustomVariables(): void {
         const config = vscode.workspace.getConfiguration('cmake-path-resolver');
         const customVariables = config.get<Record<string, string>>('customVariables', {});
+        this.debugEnabled = config.get<boolean>('debugLogging', false);
         super.loadCustomVariables(customVariables);
+        logDebug(this.debugEnabled, `Loaded ${Object.keys(customVariables).length} custom variables`);
+    }
+    
+    /**
+     * Load environment variables from VS Code settings (overrides process.env)
+     */
+    private loadVSCodeEnvironmentVariables(): void {
+        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const envOverrides = config.get<Record<string, string>>('environmentVariables', {});
+        super.loadEnvVariables(envOverrides);
+        logDebug(this.debugEnabled, `Loaded environment overrides: ${Object.keys(envOverrides).length}`);
     }
     
     /**
@@ -42,6 +67,7 @@ export class VariableResolver extends CoreVariableResolver {
     override clear(): void {
         super.clear();
         this.loadVSCodeCustomVariables();
+        this.loadVSCodeEnvironmentVariables();
     }
     
     /**
@@ -65,6 +91,37 @@ export class VariableResolver extends CoreVariableResolver {
         const cmakeFiles = await vscode.workspace.findFiles('**/*.cmake', '**/build/**');
         for (const file of cmakeFiles) {
             await this.parseFile(file.fsPath);
+        }
+
+        logDebug(this.debugEnabled, `Workspace scan completed. Variables loaded: ${this.getVariableNames().length}`);
+    }
+
+    /**
+     * Re-parse a single file incrementally
+     */
+    async reparseFile(filePath: string): Promise<void> {
+        this.removeDefinitionsForFile(filePath);
+        await this.parseFile(filePath);
+        logDebug(this.debugEnabled, `Reparsed file: ${filePath}`);
+    }
+
+    /**
+     * Remove definitions originating from a file (e.g., on delete)
+     */
+    removeFile(filePath: string): void {
+        this.removeDefinitionsForFile(filePath);
+        logDebug(this.debugEnabled, `Removed definitions for file: ${filePath}`);
+    }
+
+    /**
+     * Remove variables/definitions tied to a specific file
+     */
+    private removeDefinitionsForFile(filePath: string): void {
+        for (const [name, def] of Array.from(this.definitions.entries())) {
+            if (def.file === filePath) {
+                this.definitions.delete(name);
+                this.variables.delete(name);
+            }
         }
     }
 }

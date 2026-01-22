@@ -34,41 +34,55 @@ export class FileWatcher implements vscode.Disposable {
      * Handle file change events
      * @param _uri The changed file URI
      */
-    private onFileChange(_uri: vscode.Uri): void {
-        this.scheduleRefresh();
+    private onFileChange(uri: vscode.Uri): void {
+        this.scheduleRefresh(uri, false);
     }
     
     /**
      * Handle file deletion events
      * @param _uri The deleted file URI
      */
-    private onFileDelete(_uri: vscode.Uri): void {
-        this.scheduleRefresh();
+    private onFileDelete(uri: vscode.Uri): void {
+        this.scheduleRefresh(uri, true);
     }
     
     /**
      * Schedule a debounced refresh of variables
      */
-    private scheduleRefresh(): void {
+    private scheduleRefresh(uri?: vscode.Uri, isDelete = false): void {
         if (this.refreshDebounceTimer) {
             clearTimeout(this.refreshDebounceTimer);
         }
         
         this.refreshDebounceTimer = setTimeout(async () => {
-            await this.refreshVariables();
+            await this.refreshVariables(uri, isDelete);
         }, this.debounceDelay);
     }
     
     /**
      * Refresh all variables by rescanning the workspace
      */
-    async refreshVariables(): Promise<void> {
+    async refreshVariables(uri?: vscode.Uri, isDelete = false): Promise<void> {
         const resolver = getVariableResolver();
-        resolver.clear();
-        await resolver.scanWorkspace();
+        if (uri) {
+            const filePath = uri.fsPath;
+            if (isDelete) {
+                resolver.removeFile(filePath);
+            } else {
+                await resolver.reparseFile(filePath);
+            }
+        } else {
+            resolver.clear();
+            await resolver.scanWorkspace();
+        }
         
         // Trigger refresh of decorations in open editors
         vscode.commands.executeCommand('cmake-path-resolver.internal.refreshDecorations');
+        vscode.commands.executeCommand('cmake-path-resolver.internal.refreshStatus', {
+            count: resolver.getVariableNames().length,
+            lastRefreshed: new Date().toISOString(),
+            mode: uri ? 'incremental' : 'full'
+        });
     }
     
     /**

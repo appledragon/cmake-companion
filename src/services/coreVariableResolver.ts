@@ -35,6 +35,9 @@ export class CoreVariableResolver {
     
     /** Map of variable name to definition info */
     protected definitions: Map<string, CMakeVariableDefinition> = new Map();
+
+    /** Map of environment variable name to value */
+    protected envVariables: Map<string, string> = new Map();
     
     /** Workspace folder paths */
     protected workspaceFolders: string[] = [];
@@ -48,7 +51,26 @@ export class CoreVariableResolver {
      */
     initialize(workspaceFolders: string[]): void {
         this.workspaceFolders = workspaceFolders;
+        this.loadEnvVariables();
         this.setupBuiltInVariables();
+    }
+
+    /**
+     * Load environment variables with optional overrides
+     * @param overrides Optional overrides (takes precedence over process.env)
+     */
+    loadEnvVariables(overrides: Record<string, string> = {}): void {
+        this.envVariables.clear();
+        // seed with process.env
+        for (const [key, value] of Object.entries(process.env)) {
+            if (value !== undefined) {
+                this.envVariables.set(key, value);
+            }
+        }
+        // apply overrides
+        for (const [key, value] of Object.entries(overrides)) {
+            this.envVariables.set(key, value);
+        }
     }
     
     /**
@@ -132,6 +154,8 @@ export class CoreVariableResolver {
     clear(): void {
         this.variables.clear();
         this.definitions.clear();
+        this.envVariables.clear();
+        this.loadEnvVariables();
         this.setupBuiltInVariables();
     }
     
@@ -145,6 +169,19 @@ export class CoreVariableResolver {
     resolvePath(pathExpression: string, maxDepth = MAX_VARIABLE_RESOLUTION_DEPTH): ResolvedPath {
         let resolved = pathExpression;
         const unresolvedVariables: string[] = [];
+        
+        // First, resolve $ENV{VAR}
+        const envRegex = /\$ENV\{([^}]+)\}/g;
+        resolved = resolved.replace(envRegex, (match, envName) => {
+            const value = this.envVariables.get(envName);
+            if (value !== undefined) {
+                return value;
+            }
+            if (!unresolvedVariables.includes(`ENV{${envName}}`)) {
+                unresolvedVariables.push(`ENV{${envName}}`);
+            }
+            return match;
+        });
         let depth = 0;
         
         // Keep resolving until no more variables or max depth reached

@@ -23,6 +23,11 @@ const SUPPORTED_LANGUAGES = [
  */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('CMake Path Resolver is now active!');
+    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBar.tooltip = 'CMake Path Resolver';
+    statusBar.show();
+    context.subscriptions.push(statusBar);
+    let lastRefreshed = new Date();
     
     // Initialize variable resolver
     const resolver = getVariableResolver();
@@ -30,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     
     // Scan workspace for CMake files
     await resolver.scanWorkspace();
+    updateStatusBar();
     
     // Register document link provider for all supported languages/patterns
     for (const selector of SUPPORTED_LANGUAGES) {
@@ -87,6 +93,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
     );
     context.subscriptions.push(internalRefreshCommand);
+
+    const internalStatusCommand = vscode.commands.registerCommand(
+        'cmake-path-resolver.internal.refreshStatus',
+        (info?: { count?: number; lastRefreshed?: string }) => {
+            if (info?.lastRefreshed) {
+                lastRefreshed = new Date(info.lastRefreshed);
+            }
+            updateStatusBar(info?.count);
+        }
+    );
+    context.subscriptions.push(internalStatusCommand);
     
     // Start file watcher
     const fileWatcher = getFileWatcher();
@@ -99,16 +116,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (e.affectsConfiguration('cmake-path-resolver')) {
                 resolver.clear();
                 await resolver.scanWorkspace();
+                lastRefreshed = new Date();
+                updateStatusBar();
             }
         })
     );
     
     // Show activation message
-    const variableCount = resolver.getVariableNames().length;
-    vscode.window.setStatusBarMessage(
-        `CMake Path Resolver: ${variableCount} variables loaded`,
-        5000
-    );
+    function updateStatusBar(countOverride?: number): void {
+        const count = countOverride ?? resolver.getVariableNames().length;
+        const ts = lastRefreshed.toLocaleTimeString();
+        statusBar.text = `CMake Vars: ${count} | Refreshed ${ts}`;
+    }
 }
 
 /**

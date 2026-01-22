@@ -39,13 +39,19 @@
         "cmake-path-resolver.enabledFileTypes": {
           "type": "array",
           "default": [
-            "cmake",
-            "cpp",
-            "c",
-            "h",
-            "hpp"
+            "cmake"
           ],
           "description": "File types where CMake path resolution is enabled"
+        },
+        "cmake-path-resolver.environmentVariables": {
+          "type": "object",
+          "default": {},
+          "description": "Environment variable overrides used for $ENV{VAR} resolution"
+        },
+        "cmake-path-resolver.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose debug logging in the output channel"
         }
       }
     },
