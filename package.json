@@ -1,9 +1,9 @@
 {
-  "name": "cmake-path-resolver",
-  "displayName": "CMake Path Resolver",
+  "name": "cmake-path-helper",
+  "displayName": "CMake Path Helper",
   "description": "Resolve CMake variable paths (${VAR}/path/file.h) with underline decoration, hover tips, and click-to-navigate functionality",
   "version": "0.0.1",
-  "publisher": "cmake-path-resolver",
+  "publisher": "appledragon",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
@@ -11,6 +11,12 @@
   "categories": [
     "Programming Languages",
     "Other"
+  ],
+  "keywords": [
+    "cmake",
+    "path",
+    "variables",
+    "navigation"
   ],
   "activationEvents": [
     "onLanguage:cmake",
