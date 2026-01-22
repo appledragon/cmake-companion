@@ -83,6 +83,20 @@ describe('Variable Resolver', () => {
             
             assert.strictEqual(result.resolved, 'C:/Users/test/file');
         });
+
+        it('should resolve environment variables with overrides', () => {
+            resolver.loadEnvVariables({ TEST_ENV_PATH: '/env/value' });
+            const result = resolver.resolvePath('$ENV{TEST_ENV_PATH}/bin');
+            assert.strictEqual(result.resolved, '/env/value/bin');
+            assert.strictEqual(result.unresolvedVariables.length, 0);
+        });
+
+        it('should report unresolved environment variables when missing', () => {
+            resolver.loadEnvVariables({});
+            const result = resolver.resolvePath('$ENV{NOT_DEFINED}/lib');
+            assert.ok(result.resolved.includes('$ENV{NOT_DEFINED}'));
+            assert.ok(result.unresolvedVariables.includes('ENV{NOT_DEFINED}'));
+        });
     });
     
     describe('getVariableNames', () => {
