@@ -1,0 +1,28 @@
+# Configuration file for CMake Path Resolver example
+# This file demonstrates various CMake variable path patterns
+
+[project]
+name = ExampleProject
+version = 1.0.0
+
+[paths]
+# CMake variables that should be resolved by the plugin
+root = ${PROJECT_ROOT}
+src = ${SRC_DIR}
+include = ${INCLUDE_DIR}
+build = ${BUILD_DIR}
+third_party = ${THIRD_PARTY}
+
+[build]
+# Output paths
+binary_dir = ${BUILD_DIR}/bin
+library_dir = ${BUILD_DIR}/lib
+object_dir = ${BUILD_DIR}/obj
+cache_dir = ${BUILD_DIR}/cache
+
+[dependencies]
+# Third-party library paths
+boost_include = ${THIRD_PARTY}/boost/include
+boost_lib = ${THIRD_PARTY}/boost/lib
+openssl_include = ${THIRD_PARTY}/openssl/include
+openssl_lib = ${THIRD_PARTY}/openssl/lib

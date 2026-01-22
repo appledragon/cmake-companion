@@ -4,6 +4,7 @@
   "description": "Resolve CMake variable paths (${VAR}/path/file.h) with underline decoration, hover tips, and click-to-navigate functionality",
   "version": "0.0.1",
   "publisher": "cmake-path-resolver",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },

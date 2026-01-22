@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" fill="#ffffff" rx="24"/>
+  
+  <!-- Main container for CMake symbols -->
+  <!-- Left bracket ${  -->
+  <g fill="none" stroke="#0066cc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Dollar sign -->
+    <circle cx="28" cy="64" r="12" fill="none" stroke="#0066cc" stroke-width="2.5"/>
+    <line x1="28" y1="52" x2="28" y2="76" stroke="#0066cc" stroke-width="2.5"/>
+    
+    <!-- Variable name indicator (geometric shape) -->
+    <rect x="48" y="44" width="32" height="40" rx="4" fill="none" stroke="#ff6b35" stroke-width="2.5"/>
+    
+    <!-- Arrow showing path resolution -->
+    <path d="M 88 56 L 104 64 L 88 72" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="85" y1="64" x2="103" y2="64" stroke="#10b981" stroke-width="2.5"/>
+  </g>
+  
+  <!-- File/folder icons to show linking -->
+  <g fill="#0066cc" opacity="0.8">
+    <!-- File icon bottom left -->
+    <rect x="20" y="85" width="20" height="28" rx="2"/>
+    <line x1="20" y1="95" x2="40" y2="95" stroke="white" stroke-width="1.5"/>
+    <line x1="20" y1="103" x2="40" y2="103" stroke="white" stroke-width="1.5"/>
+  </g>
+  
+  <!-- Folder icon bottom right -->
+  <g fill="#ff6b35" opacity="0.8">
+    <path d="M 88 85 L 88 97 Q 88 111 100 111 L 108 111 Q 108 111 108 103 L 108 93 Q 108 85 100 85 L 92 85 Q 88 85 88 89 Z" fill="#ff6b35"/>
+    <rect x="88" y="85" width="20" height="4" rx="1" fill="#ffb84d"/>
+  </g>
+  
+  <!-- Decorative dots showing connection -->
+  <circle cx="50" cy="50" r="2" fill="#10b981" opacity="0.6"/>
+  <circle cx="70" cy="58" r="2" fill="#10b981" opacity="0.6"/>
+</svg>

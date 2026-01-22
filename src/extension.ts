@@ -4,16 +4,15 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { CMakeDocumentLinkProvider, CMakeHoverProvider, CMakeDefinitionProvider } from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
 
 // Supported language IDs and file patterns
+// Only support CMake files - C/C++ path resolution is handled by other extensions
 const SUPPORTED_LANGUAGES = [
     { language: 'cmake' },
-    { language: 'cpp' },
-    { language: 'c' },
-    { pattern: '**/*.h' },
-    { pattern: '**/*.hpp' },
     { pattern: '**/*.cmake' },
     { pattern: '**/CMakeLists.txt' }
 ];
@@ -71,6 +70,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         refreshVariablesCommandHandler
     );
     context.subscriptions.push(refreshCommand);
+    
+    // Command to open paths (files or directories)
+    const openPathCommand = vscode.commands.registerCommand(
+        'cmake-path-resolver.openPath',
+        openPathCommandHandler
+    );
+    context.subscriptions.push(openPathCommand);
     
     // Internal command to refresh decorations (used by file watcher)
     const internalRefreshCommand = vscode.commands.registerCommand(
@@ -186,4 +192,61 @@ async function refreshVariablesCommandHandler(): Promise<void> {
     vscode.window.showInformationMessage(
         `CMake Path Resolver: ${variableCount} variables loaded`
     );
+}
+
+/**
+ * Command handler: Open Path
+ * Intelligently opens files or directories
+ * For files: opens in editor
+ * For directories: reveals in explorer if in workspace, opens new window if outside
+ */
+async function openPathCommandHandler(targetPath: string): Promise<void> {
+    if (!fs.existsSync(targetPath)) {
+        vscode.window.showErrorMessage(`Path does not exist: ${targetPath}`);
+        return;
+    }
+    
+    const stat = fs.statSync(targetPath);
+    
+    if (stat.isFile()) {
+        // Open file in current window
+        try {
+            const doc = await vscode.workspace.openTextDocument(targetPath);
+            await vscode.window.showTextDocument(doc);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to open file: ${targetPath}`);
+        }
+    } else if (stat.isDirectory()) {
+        // Check if directory is within current workspace
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        let isInCurrentWorkspace = false;
+        
+        if (workspaceFolders) {
+            const targetAbspath = path.resolve(targetPath);
+            for (const folder of workspaceFolders) {
+                const folderPath = path.resolve(folder.uri.fsPath);
+                // Check if target is inside this workspace folder
+                if (targetAbspath === folderPath || targetAbspath.startsWith(folderPath + path.sep)) {
+                    isInCurrentWorkspace = true;
+                    break;
+                }
+            }
+        }
+        
+        if (isInCurrentWorkspace) {
+            // Reveal directory in explorer panel (in current workspace)
+            try {
+                await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(targetPath));
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to reveal directory: ${targetPath}`);
+            }
+        } else {
+            // Open directory in new VS Code window
+            try {
+                await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetPath), true);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to open directory in new window: ${targetPath}`);
+            }
+        }
+    }
 }

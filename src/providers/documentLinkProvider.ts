@@ -1,9 +1,12 @@
 /**
  * Document Link Provider
  * Provides clickable links for CMake variable paths with underline decoration
+ * Supports both files and directories with smart navigation
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
@@ -37,13 +40,27 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
                 const endPos = document.positionAt(match.endIndex);
                 const range = new vscode.Range(startPos, endPos);
                 
-                // Create a file URI for the resolved path
-                const targetUri = vscode.Uri.file(resolved.resolved);
+                // Create a command URI for the resolved path to enable custom handling
+                const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
+                const commandUri = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
                 
-                const link = new vscode.DocumentLink(range, targetUri);
-                link.tooltip = resolved.exists 
-                    ? `Open: ${resolved.resolved}`
-                    : `Path: ${resolved.resolved} (file not found)`;
+                const link = new vscode.DocumentLink(range, commandUri);
+                
+                // Add tooltip based on path type
+                if (resolved.exists) {
+                    try {
+                        const stat = fs.statSync(resolved.resolved);
+                        if (stat.isDirectory()) {
+                            link.tooltip = `Open directory: ${resolved.resolved}`;
+                        } else {
+                            link.tooltip = `Open file: ${resolved.resolved}`;
+                        }
+                    } catch {
+                        link.tooltip = `Open: ${resolved.resolved}`;
+                    }
+                } else {
+                    link.tooltip = `Path: ${resolved.resolved} (not found)`;
+                }
                 
                 links.push(link);
             }

@@ -34,8 +34,9 @@ const CMAKE_VARIABLE_REGEX = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 /**
  * Regular expression to match CMake path expressions
  * Matches paths that start with ${VAR} and may continue with path segments
+ * Path segments are alphanumeric, underscores, hyphens, dots, and forward slashes
  */
-const CMAKE_PATH_REGEX = /\$\{[A-Za-z_][A-Za-z0-9_]*\}(?:\/[^\s"'<>|*?\n]+)?/g;
+const CMAKE_PATH_REGEX = /\$\{[A-Za-z_][A-Za-z0-9_]*\}(?:(?:\/|\\)[A-Za-z0-9_.@\-\/\\]*)?/g;
 
 /**
  * Parse all CMake variables from text

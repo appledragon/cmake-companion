@@ -1,10 +1,11 @@
 /**
  * Definition Provider
- * Enables Ctrl+Click navigation to resolved paths
+ * Enables Ctrl+Click navigation to resolved paths (files and directories)
  */
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
@@ -63,12 +64,27 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
                         new vscode.Position(0, 0)
                     );
                 } else if (stat.isDirectory()) {
-                    // For directories, try to open the folder in explorer
-                    // VS Code will handle this appropriately
-                    return new vscode.Location(
-                        vscode.Uri.file(resolved.resolved),
-                        new vscode.Position(0, 0)
-                    );
+                    // For directories, check if it's in current workspace
+                    const workspaceFolders = vscode.workspace.workspaceFolders;
+                    if (workspaceFolders) {
+                        const targetAbspath = path.resolve(resolved.resolved);
+                        for (const folder of workspaceFolders) {
+                            const folderPath = path.resolve(folder.uri.fsPath);
+                            // If directory is in workspace, return a location that will trigger folder reveal
+                            if (targetAbspath === folderPath || targetAbspath.startsWith(folderPath + path.sep)) {
+                                // Create a location that references the directory
+                                return new vscode.Location(
+                                    vscode.Uri.file(resolved.resolved),
+                                    new vscode.Position(0, 0)
+                                );
+                            }
+                        }
+                    }
+                    
+                    // Directory outside workspace - use command to open it
+                    // Return null here since definition provider can't directly execute commands
+                    // The openPath command will be handled via document link instead
+                    return null;
                 }
             } catch (error) {
                 // File doesn't exist or can't be accessed
