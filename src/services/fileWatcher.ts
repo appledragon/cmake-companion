@@ -1,38 +1,57 @@
 /**
  * File Watcher Service
  * Monitors CMakeLists.txt and *.cmake files for changes
+ * Only watches files that have been opened by the user
  */
 
 import * as vscode from 'vscode';
 import { getVariableResolver } from './variableResolver';
 
 export class FileWatcher implements vscode.Disposable {
-    private watchers: vscode.FileSystemWatcher[] = [];
+    private watchers: Map<string, vscode.FileSystemWatcher> = new Map();
     private refreshDebounceTimer: NodeJS.Timeout | null = null;
     private readonly debounceDelay = 500; // ms
     
     /**
      * Start watching for CMake file changes
+     * Note: Individual files are added to watch list via addFile()
      */
     start(): void {
-        // Watch CMakeLists.txt files
-        const cmakeListsWatcher = vscode.workspace.createFileSystemWatcher('**/CMakeLists.txt');
-        cmakeListsWatcher.onDidChange(this.onFileChange.bind(this));
-        cmakeListsWatcher.onDidCreate(this.onFileChange.bind(this));
-        cmakeListsWatcher.onDidDelete(this.onFileDelete.bind(this));
-        this.watchers.push(cmakeListsWatcher);
+        // No longer create global watchers - files are watched individually when opened
+    }
+    
+    /**
+     * Add a specific file to the watch list
+     * @param filePath The file path to watch
+     */
+    addFile(filePath: string): void {
+        // Don't add if already watching
+        if (this.watchers.has(filePath)) {
+            return;
+        }
         
-        // Watch .cmake files
-        const cmakeFilesWatcher = vscode.workspace.createFileSystemWatcher('**/*.cmake');
-        cmakeFilesWatcher.onDidChange(this.onFileChange.bind(this));
-        cmakeFilesWatcher.onDidCreate(this.onFileChange.bind(this));
-        cmakeFilesWatcher.onDidDelete(this.onFileDelete.bind(this));
-        this.watchers.push(cmakeFilesWatcher);
+        // Create a watcher for this specific file
+        const watcher = vscode.workspace.createFileSystemWatcher(filePath);
+        watcher.onDidChange(this.onFileChange.bind(this));
+        watcher.onDidDelete(this.onFileDelete.bind(this));
+        this.watchers.set(filePath, watcher);
+    }
+    
+    /**
+     * Remove a file from the watch list
+     * @param filePath The file path to stop watching
+     */
+    removeFile(filePath: string): void {
+        const watcher = this.watchers.get(filePath);
+        if (watcher) {
+            watcher.dispose();
+            this.watchers.delete(filePath);
+        }
     }
     
     /**
      * Handle file change events
-     * @param _uri The changed file URI
+     * @param uri The changed file URI
      */
     private onFileChange(uri: vscode.Uri): void {
         this.scheduleRefresh(uri, false);
@@ -40,7 +59,7 @@ export class FileWatcher implements vscode.Disposable {
     
     /**
      * Handle file deletion events
-     * @param _uri The deleted file URI
+     * @param uri The deleted file URI
      */
     private onFileDelete(uri: vscode.Uri): void {
         this.scheduleRefresh(uri, true);
@@ -60,7 +79,7 @@ export class FileWatcher implements vscode.Disposable {
     }
     
     /**
-     * Refresh all variables by rescanning the workspace
+     * Refresh variables for a specific file
      */
     async refreshVariables(uri?: vscode.Uri, isDelete = false): Promise<void> {
         const resolver = getVariableResolver();
@@ -68,12 +87,10 @@ export class FileWatcher implements vscode.Disposable {
             const filePath = uri.fsPath;
             if (isDelete) {
                 resolver.removeFile(filePath);
+                this.removeFile(filePath);
             } else {
                 await resolver.reparseFile(filePath);
             }
-        } else {
-            resolver.clear();
-            await resolver.scanWorkspace();
         }
         
         // Trigger refresh of decorations in open editors
@@ -81,7 +98,7 @@ export class FileWatcher implements vscode.Disposable {
         vscode.commands.executeCommand('cmake-path-resolver.internal.refreshStatus', {
             count: resolver.getVariableNames().length,
             lastRefreshed: new Date().toISOString(),
-            mode: uri ? 'incremental' : 'full'
+            mode: 'incremental'
         });
     }
     
@@ -93,10 +110,10 @@ export class FileWatcher implements vscode.Disposable {
             clearTimeout(this.refreshDebounceTimer);
         }
         
-        for (const watcher of this.watchers) {
+        for (const watcher of this.watchers.values()) {
             watcher.dispose();
         }
-        this.watchers = [];
+        this.watchers.clear();
     }
 }
 

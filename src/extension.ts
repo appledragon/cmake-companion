@@ -33,6 +33,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const resolver = getVariableResolver();
     resolver.initializeFromVSCode(vscode.workspace.workspaceFolders);
     
+    // Initialize file watcher (files will be added to watch list when opened)
+    const fileWatcher = getFileWatcher();
+    fileWatcher.start();
+    context.subscriptions.push({ dispose: () => disposeFileWatcher() });
+    
     // Don't scan entire workspace - parse files on-demand when opened
     updateStatusBar();
     
@@ -111,6 +116,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (isCMakeFile(document)) {
                 const filePath = document.uri.fsPath;
                 await resolver.parseFile(filePath);
+                // Add to file watcher list
+                fileWatcher.addFile(filePath);
                 lastRefreshed = new Date();
                 updateStatusBar();
             }
@@ -121,15 +128,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     for (const document of vscode.workspace.textDocuments) {
         if (isCMakeFile(document)) {
             await resolver.parseFile(document.uri.fsPath);
+            // Add to file watcher list
+            fileWatcher.addFile(document.uri.fsPath);
         }
     }
     lastRefreshed = new Date();
     updateStatusBar();
-    
-    // Start file watcher
-    const fileWatcher = getFileWatcher();
-    fileWatcher.start();
-    context.subscriptions.push({ dispose: () => disposeFileWatcher() });
     
     // Listen for configuration changes
     context.subscriptions.push(
