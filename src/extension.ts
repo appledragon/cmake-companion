@@ -29,12 +29,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(statusBar);
     let lastRefreshed = new Date();
     
-    // Initialize variable resolver
+    // Initialize variable resolver (but don't scan workspace yet)
     const resolver = getVariableResolver();
     resolver.initializeFromVSCode(vscode.workspace.workspaceFolders);
     
-    // Scan workspace for CMake files
-    await resolver.scanWorkspace();
+    // Initialize file watcher (files will be added to watch list when opened)
+    const fileWatcher = getFileWatcher();
+    fileWatcher.start();
+    context.subscriptions.push({ dispose: () => disposeFileWatcher() });
+    
+    // Don't scan entire workspace - parse files on-demand when opened
     updateStatusBar();
     
     // Register document link provider for all supported languages/patterns
@@ -105,17 +109,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(internalStatusCommand);
     
-    // Start file watcher
-    const fileWatcher = getFileWatcher();
-    fileWatcher.start();
-    context.subscriptions.push({ dispose: () => disposeFileWatcher() });
+    // Parse CMake files on-demand when they are opened
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(async (document) => {
+            // Only parse CMake files
+            if (isCMakeFile(document)) {
+                const filePath = document.uri.fsPath;
+                await resolver.parseFile(filePath);
+                // Add to file watcher list
+                fileWatcher.addFile(filePath);
+                lastRefreshed = new Date();
+                updateStatusBar();
+            }
+        })
+    );
+    
+    // Also parse any already-open CMake files at activation
+    for (const document of vscode.workspace.textDocuments) {
+        if (isCMakeFile(document)) {
+            await resolver.parseFile(document.uri.fsPath);
+            // Add to file watcher list
+            fileWatcher.addFile(document.uri.fsPath);
+        }
+    }
+    lastRefreshed = new Date();
+    updateStatusBar();
     
     // Listen for configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('cmake-path-resolver')) {
                 resolver.clear();
-                await resolver.scanWorkspace();
+                // Reparse only currently open CMake files
+                for (const document of vscode.workspace.textDocuments) {
+                    if (isCMakeFile(document)) {
+                        await resolver.parseFile(document.uri.fsPath);
+                    }
+                }
                 lastRefreshed = new Date();
                 updateStatusBar();
             }
@@ -128,6 +158,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const ts = lastRefreshed.toLocaleTimeString();
         statusBar.text = `CMake Vars: ${count} | Refreshed ${ts}`;
     }
+}
+
+/**
+ * Check if a document is a CMake file
+ * @param document The document to check
+ * @returns True if the document is a CMake file
+ */
+function isCMakeFile(document: vscode.TextDocument): boolean {
+    // Check language ID
+    if (document.languageId === 'cmake') {
+        return true;
+    }
+    
+    // Check file name/extension
+    const fileName = path.basename(document.fileName);
+    if (fileName === 'CMakeLists.txt' || fileName.endsWith('.cmake')) {
+        return true;
+    }
+    
+    return false;
 }
 
 /**
@@ -190,7 +240,7 @@ async function resolvePathCommandHandler(): Promise<void> {
 
 /**
  * Command handler: Refresh CMake Variables
- * Manually trigger a refresh of all CMake variables
+ * Manually trigger a refresh of CMake variables from currently open files
  */
 async function refreshVariablesCommandHandler(): Promise<void> {
     const resolver = getVariableResolver();
@@ -203,13 +253,18 @@ async function refreshVariablesCommandHandler(): Promise<void> {
         },
         async () => {
             resolver.clear();
-            await resolver.scanWorkspace();
+            // Only reparse currently open CMake files
+            for (const document of vscode.workspace.textDocuments) {
+                if (isCMakeFile(document)) {
+                    await resolver.parseFile(document.uri.fsPath);
+                }
+            }
         }
     );
     
     const variableCount = resolver.getVariableNames().length;
     vscode.window.showInformationMessage(
-        `CMake Path Resolver: ${variableCount} variables loaded`
+        `CMake Path Resolver: ${variableCount} variables loaded from open files`
     );
 }
 
