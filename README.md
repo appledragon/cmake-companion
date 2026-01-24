@@ -71,6 +71,7 @@ Configure document formatting behavior:
 
 ```json
 {
+  "cmake-path-resolver.formatting.style": "default",
   "cmake-path-resolver.formatting.maxLineLength": 0,
   "cmake-path-resolver.formatting.spaceAfterOpenParen": false,
   "cmake-path-resolver.formatting.spaceBeforeCloseParen": false,
@@ -78,10 +79,27 @@ Configure document formatting behavior:
 }
 ```
 
-- `maxLineLength`: Maximum line length (0 = no limit)
-- `spaceAfterOpenParen`: Add space after opening parenthesis in commands
-- `spaceBeforeCloseParen`: Add space before closing parenthesis in commands
-- `uppercaseCommands`: Convert CMake command names to uppercase
+- `style`: Formatting style preset (`"default"` or `"google"`)
+- `maxLineLength`: Maximum line length (0 = no limit). Overrides the style preset value when set.
+- `spaceAfterOpenParen`: Add space after opening parenthesis in commands. Overrides the style preset value when set.
+- `spaceBeforeCloseParen`: Add space before closing parenthesis in commands. Overrides the style preset value when set.
+- `uppercaseCommands`: Convert CMake command names to uppercase. Overrides the style preset value when set.
+
+#### Google Style Formatting
+
+To use Google-style formatting (similar to clang-format's Google style for CMake):
+
+```json
+{
+  "cmake-path-resolver.formatting.style": "google"
+}
+```
+
+The Google style preset uses:
+- Lowercase commands
+- 2-space indentation
+- No spaces inside parentheses
+- 80 character line length limit
 
 ## Built-in Variables
 

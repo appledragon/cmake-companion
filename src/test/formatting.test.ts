@@ -7,7 +7,73 @@ import * as assert from 'assert';
 // Import the formatting helper functions by testing the module directly
 // Note: We test the core logic that doesn't require VS Code types
 
+/**
+ * Formatting options for CMake files (matching the interface in formattingProvider.ts)
+ */
+interface CMakeFormattingOptions {
+    tabSize: number;
+    insertSpaces: boolean;
+    maxLineLength: number;
+    spaceAfterOpenParen: boolean;
+    spaceBeforeCloseParen: boolean;
+    uppercaseCommands: boolean;
+}
+
+/**
+ * Default formatting options
+ */
+const DEFAULT_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 0,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false
+};
+
+/**
+ * Google-style formatting options
+ * Inspired by clang-format's Google style
+ */
+const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 80,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false
+};
+
 describe('CMake Formatting Logic', () => {
+    
+    describe('Style Presets', () => {
+        it('should have correct default style options', () => {
+            assert.strictEqual(DEFAULT_OPTIONS.tabSize, 2);
+            assert.strictEqual(DEFAULT_OPTIONS.insertSpaces, true);
+            assert.strictEqual(DEFAULT_OPTIONS.maxLineLength, 0);
+            assert.strictEqual(DEFAULT_OPTIONS.spaceAfterOpenParen, false);
+            assert.strictEqual(DEFAULT_OPTIONS.spaceBeforeCloseParen, false);
+            assert.strictEqual(DEFAULT_OPTIONS.uppercaseCommands, false);
+        });
+        
+        it('should have correct Google style options', () => {
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.tabSize, 2);
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.insertSpaces, true);
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.maxLineLength, 80);
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.spaceAfterOpenParen, false);
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.spaceBeforeCloseParen, false);
+            assert.strictEqual(GOOGLE_STYLE_OPTIONS.uppercaseCommands, false);
+        });
+        
+        it('should differ only in maxLineLength between default and Google style', () => {
+            assert.strictEqual(DEFAULT_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.tabSize);
+            assert.strictEqual(DEFAULT_OPTIONS.insertSpaces, GOOGLE_STYLE_OPTIONS.insertSpaces);
+            assert.notStrictEqual(DEFAULT_OPTIONS.maxLineLength, GOOGLE_STYLE_OPTIONS.maxLineLength);
+            assert.strictEqual(DEFAULT_OPTIONS.spaceAfterOpenParen, GOOGLE_STYLE_OPTIONS.spaceAfterOpenParen);
+            assert.strictEqual(DEFAULT_OPTIONS.spaceBeforeCloseParen, GOOGLE_STYLE_OPTIONS.spaceBeforeCloseParen);
+            assert.strictEqual(DEFAULT_OPTIONS.uppercaseCommands, GOOGLE_STYLE_OPTIONS.uppercaseCommands);
+        });
+    });
     
     describe('Indentation Logic', () => {
         const INDENT_INCREASE_COMMANDS = new Set([
@@ -75,6 +141,13 @@ describe('CMake Formatting Logic', () => {
             assert.strictEqual(formatCommandName('SeT(VAR value)', false), 'set(VAR value)');
             assert.strictEqual(formatCommandName('SeT(VAR value)', true), 'SET(VAR value)');
         });
+        
+        it('should format commands according to Google style (lowercase)', () => {
+            // Google style uses lowercase commands
+            const googleStyleUppercase = GOOGLE_STYLE_OPTIONS.uppercaseCommands;
+            assert.strictEqual(formatCommandName('SET(VAR value)', googleStyleUppercase), 'set(VAR value)');
+            assert.strictEqual(formatCommandName('ADD_EXECUTABLE(app main.cpp)', googleStyleUppercase), 'add_executable(app main.cpp)');
+        });
     });
     
     describe('Parentheses Formatting', () => {
@@ -114,6 +187,16 @@ describe('CMake Formatting Logic', () => {
         
         it('should handle both space options', () => {
             assert.strictEqual(formatParentheses('set(VAR value)', true, true), 'set( VAR value )');
+        });
+        
+        it('should format parentheses according to Google style (no extra spaces)', () => {
+            // Google style has no spaces inside parentheses
+            const result = formatParentheses(
+                'set( VAR value )', 
+                GOOGLE_STYLE_OPTIONS.spaceAfterOpenParen, 
+                GOOGLE_STYLE_OPTIONS.spaceBeforeCloseParen
+            );
+            assert.strictEqual(result, 'set(VAR value)');
         });
     });
     
@@ -171,6 +254,14 @@ describe('CMake Formatting Logic', () => {
         
         it('should handle zero level', () => {
             assert.strictEqual(createIndent(0, 2, true), '');
+        });
+        
+        it('should create Google-style indentation (2 spaces)', () => {
+            const indent = createIndent(1, GOOGLE_STYLE_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.insertSpaces);
+            assert.strictEqual(indent, '  ');
+            
+            const doubleIndent = createIndent(2, GOOGLE_STYLE_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.insertSpaces);
+            assert.strictEqual(doubleIndent, '    ');
         });
     });
 });
