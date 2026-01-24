@@ -1,0 +1,283 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "CMake",
+  "scopeName": "source.cmake",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#variables" },
+    { "include": "#commands" },
+    { "include": "#generator-expressions" },
+    { "include": "#operators" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.cmake",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.block.cmake",
+          "begin": "#\\[\\[",
+          "end": "\\]\\]"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.cmake",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "include": "#variables" },
+            { "include": "#escape-sequences" }
+          ]
+        },
+        {
+          "name": "string.quoted.bracket.cmake",
+          "begin": "\\[\\[",
+          "end": "\\]\\]"
+        }
+      ]
+    },
+    "escape-sequences": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.cmake",
+          "match": "\\\\[\\\\\"nrt;]"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.environment.cmake",
+          "match": "\\$ENV\\{[A-Za-z_][A-Za-z0-9_]*\\}",
+          "captures": {
+            "0": { "name": "variable.other.environment.cmake" }
+          }
+        },
+        {
+          "name": "variable.other.cmake",
+          "match": "\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}",
+          "captures": {
+            "0": { "name": "variable.other.cmake" }
+          }
+        },
+        {
+          "name": "variable.other.cache.cmake",
+          "match": "\\$CACHE\\{[A-Za-z_][A-Za-z0-9_]*\\}",
+          "captures": {
+            "0": { "name": "variable.other.cache.cmake" }
+          }
+        }
+      ]
+    },
+    "generator-expressions": {
+      "patterns": [
+        {
+          "name": "support.function.generator-expression.cmake",
+          "begin": "\\$<",
+          "end": ">",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.generator-expression.begin.cmake" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.generator-expression.end.cmake" }
+          },
+          "patterns": [
+            { "include": "#generator-expressions" },
+            { "include": "#variables" },
+            {
+              "name": "keyword.operator.generator-expression.cmake",
+              "match": "\\b(AND|OR|NOT|BOOL|IF|STREQUAL|EQUAL|VERSION_LESS|VERSION_GREATER|VERSION_EQUAL|TARGET_FILE|TARGET_PROPERTY|COMPILE_LANGUAGE|CONFIG|PLATFORM_ID|BUILD_INTERFACE|INSTALL_INTERFACE)\\b"
+            }
+          ]
+        }
+      ]
+    },
+    "commands": {
+      "patterns": [
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(cmake_minimum_required|cmake_policy|cmake_parse_arguments|cmake_host_system_information|cmake_language|cmake_path)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "support.function.cmake-command.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(project|enable_language|enable_testing)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "support.function.project.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(set|unset|option|set_property|get_property|define_property|set_directory_properties|get_directory_property|set_source_files_properties|get_source_file_property|set_target_properties|get_target_property|set_tests_properties|get_test_property)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.variable.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(if|elseif|else|endif|foreach|endforeach|while|endwhile|break|continue|return|function|endfunction|macro|endmacro|block|endblock)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.flow.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(add_executable|add_library|add_custom_target|add_custom_command|add_dependencies|add_subdirectory|add_test|add_compile_definitions|add_compile_options|add_link_options)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "entity.name.function.target.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(target_sources|target_include_directories|target_link_libraries|target_link_directories|target_compile_definitions|target_compile_options|target_compile_features|target_link_options|target_precompile_headers)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "entity.name.function.target.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(include|include_directories|link_directories|link_libraries|find_package|find_library|find_path|find_file|find_program|include_guard|include_external_msproject)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "support.function.include.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b(message|math|string|list|file|execute_process|configure_file|install|export|get_filename_component|separate_arguments|mark_as_advanced)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "support.function.utility.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        },
+        {
+          "name": "meta.function-call.cmake",
+          "begin": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "entity.name.function.cmake" }
+          },
+          "patterns": [
+            { "include": "#command-arguments" }
+          ]
+        }
+      ]
+    },
+    "command-arguments": {
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#variables" },
+        { "include": "#generator-expressions" },
+        { "include": "#numbers" },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(REQUIRED|COMPONENTS|CONFIG|MODULE|NO_MODULE|QUIET|EXACT|OPTIONAL_COMPONENTS|VERSION|PATHS|HINTS|PATH_SUFFIXES|NAMES|CONFIGS|NO_DEFAULT_PATH|NO_CMAKE_ENVIRONMENT_PATH|NO_CMAKE_PATH|NO_SYSTEM_ENVIRONMENT_PATH|NO_CMAKE_PACKAGE_REGISTRY|NO_CMAKE_BUILDS_PATH|NO_CMAKE_SYSTEM_PATH|NO_CMAKE_SYSTEM_PACKAGE_REGISTRY|CMAKE_FIND_ROOT_PATH_BOTH|ONLY_CMAKE_FIND_ROOT_PATH|NO_CMAKE_FIND_ROOT_PATH)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(PRIVATE|PUBLIC|INTERFACE|STATIC|SHARED|MODULE|OBJECT|IMPORTED|GLOBAL|ALIAS|EXCLUDE_FROM_ALL)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(CACHE|INTERNAL|FILEPATH|PATH|STRING|BOOL|FORCE|PARENT_SCOPE)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(ON|OFF|TRUE|FALSE|YES|NO)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(AND|OR|NOT|COMMAND|POLICY|TARGET|TEST|DEFINED|EXISTS|IS_NEWER_THAN|IS_DIRECTORY|IS_SYMLINK|IS_ABSOLUTE|MATCHES|LESS|GREATER|EQUAL|LESS_EQUAL|GREATER_EQUAL|STRLESS|STRGREATER|STREQUAL|STRLESS_EQUAL|STRGREATER_EQUAL|VERSION_LESS|VERSION_GREATER|VERSION_EQUAL|VERSION_LESS_EQUAL|VERSION_GREATER_EQUAL|IN_LIST)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(FATAL_ERROR|SEND_ERROR|WARNING|AUTHOR_WARNING|DEPRECATION|NOTICE|STATUS|VERBOSE|DEBUG|TRACE|CHECK_START|CHECK_PASS|CHECK_FAIL)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(APPEND|PREPEND|REMOVE_ITEM|REMOVE_AT|REMOVE_DUPLICATES|REVERSE|SORT|FILTER|INCLUDE|EXCLUDE|REGEX|LENGTH|GET|JOIN|SUBLIST|FIND|INSERT|POP_BACK|POP_FRONT|TRANSFORM)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(READ|WRITE|APPEND|STRINGS|GLOB|GLOB_RECURSE|RENAME|REMOVE|REMOVE_RECURSE|MAKE_DIRECTORY|RELATIVE_PATH|TO_CMAKE_PATH|TO_NATIVE_PATH|DOWNLOAD|UPLOAD|TIMESTAMP|GENERATE|COPY|INSTALL|SIZE|READ_SYMLINK|CREATE_LINK|CHMOD|CHMOD_RECURSE|TOUCH|TOUCH_NOCREATE|ARCHIVE_CREATE|ARCHIVE_EXTRACT)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(COMMAND|WORKING_DIRECTORY|RESULT_VARIABLE|RESULTS_VARIABLE|OUTPUT_VARIABLE|ERROR_VARIABLE|INPUT_FILE|OUTPUT_FILE|ERROR_FILE|OUTPUT_QUIET|ERROR_QUIET|OUTPUT_STRIP_TRAILING_WHITESPACE|ERROR_STRIP_TRAILING_WHITESPACE|ENCODING|TIMEOUT|COMMAND_ECHO)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(PRE_BUILD|PRE_LINK|POST_BUILD|TARGET|OUTPUT|DEPENDS|BYPRODUCTS|COMMENT|DEPFILE|VERBATIM|USES_TERMINAL|COMMAND_EXPAND_LISTS|MAIN_DEPENDENCY|IMPLICIT_DEPENDS)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(DESTINATION|FILES|DIRECTORY|PROGRAMS|SCRIPT|CODE|EXPORT|ARCHIVE|LIBRARY|RUNTIME|FRAMEWORK|BUNDLE|RESOURCE|PUBLIC_HEADER|PRIVATE_HEADER|FILE_SET|PERMISSIONS|CONFIGURATIONS|COMPONENT|OPTIONAL|RENAME|EXCLUDE|PATTERN|REGEX|FILES_MATCHING)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(LANGUAGES|C|CXX|CUDA|OBJC|OBJCXX|Fortran|HIP|ISPC|ASM|ASM_MASM|ASM_NASM|Swift|VERSION|DESCRIPTION|HOMEPAGE_URL)\\b"
+        },
+        {
+          "name": "keyword.other.cmake",
+          "match": "\\b(RANGE|IN|ITEMS|LISTS|ZIP_LISTS)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.cmake",
+          "match": "\\b(AND|OR|NOT)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.cmake",
+          "match": "\\b[0-9]+(\\.[0-9]+)?\\b"
+        }
+      ]
+    }
+  }
+}
