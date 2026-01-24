@@ -6,6 +6,11 @@
 import * as vscode from 'vscode';
 
 /**
+ * Supported formatting style presets
+ */
+export type CMakeFormattingStyle = 'default' | 'google';
+
+/**
  * Formatting options for CMake files
  */
 export interface CMakeFormattingOptions {
@@ -33,6 +38,31 @@ const DEFAULT_OPTIONS: CMakeFormattingOptions = {
     spaceAfterOpenParen: false,
     spaceBeforeCloseParen: false,
     uppercaseCommands: false
+};
+
+/**
+ * Google-style formatting options
+ * Inspired by clang-format's Google style:
+ * - Lowercase commands
+ * - 2 spaces for indentation
+ * - No spaces inside parentheses
+ * - 80 character line length limit
+ */
+const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 80,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false
+};
+
+/**
+ * Style presets mapping
+ */
+const STYLE_PRESETS: Record<CMakeFormattingStyle, CMakeFormattingOptions> = {
+    'default': DEFAULT_OPTIONS,
+    'google': GOOGLE_STYLE_OPTIONS
 };
 
 /**
@@ -134,17 +164,23 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
     
     /**
      * Get formatting options from VS Code settings
+     * Supports style presets (default, google) with individual option overrides
      */
     private getFormattingOptions(options: vscode.FormattingOptions): CMakeFormattingOptions {
         const config = vscode.workspace.getConfiguration('cmake-path-resolver');
         
+        // Get the style preset (default or google)
+        const style = config.get<CMakeFormattingStyle>('formatting.style', 'default');
+        const baseOptions = STYLE_PRESETS[style] || DEFAULT_OPTIONS;
+        
+        // Allow individual overrides on top of the style preset
         return {
-            tabSize: options.tabSize || DEFAULT_OPTIONS.tabSize,
-            insertSpaces: options.insertSpaces !== undefined ? options.insertSpaces : DEFAULT_OPTIONS.insertSpaces,
-            maxLineLength: config.get<number>('formatting.maxLineLength', DEFAULT_OPTIONS.maxLineLength),
-            spaceAfterOpenParen: config.get<boolean>('formatting.spaceAfterOpenParen', DEFAULT_OPTIONS.spaceAfterOpenParen),
-            spaceBeforeCloseParen: config.get<boolean>('formatting.spaceBeforeCloseParen', DEFAULT_OPTIONS.spaceBeforeCloseParen),
-            uppercaseCommands: config.get<boolean>('formatting.uppercaseCommands', DEFAULT_OPTIONS.uppercaseCommands)
+            tabSize: options.tabSize || baseOptions.tabSize,
+            insertSpaces: options.insertSpaces !== undefined ? options.insertSpaces : baseOptions.insertSpaces,
+            maxLineLength: config.get<number>('formatting.maxLineLength') ?? baseOptions.maxLineLength,
+            spaceAfterOpenParen: config.get<boolean>('formatting.spaceAfterOpenParen') ?? baseOptions.spaceAfterOpenParen,
+            spaceBeforeCloseParen: config.get<boolean>('formatting.spaceBeforeCloseParen') ?? baseOptions.spaceBeforeCloseParen,
+            uppercaseCommands: config.get<boolean>('formatting.uppercaseCommands') ?? baseOptions.uppercaseCommands
         };
     }
     

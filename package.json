@@ -62,25 +62,27 @@
           "default": false,
           "description": "Enable verbose debug logging in the output channel"
         },
+        "cmake-path-resolver.formatting.style": {
+          "type": "string",
+          "enum": ["default", "google"],
+          "default": "default",
+          "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
+        },
         "cmake-path-resolver.formatting.maxLineLength": {
           "type": "number",
-          "default": 0,
-          "description": "Maximum line length for formatting (0 = no limit)"
+          "description": "Maximum line length for formatting (0 = no limit). Overrides the style preset value when set."
         },
         "cmake-path-resolver.formatting.spaceAfterOpenParen": {
           "type": "boolean",
-          "default": false,
-          "description": "Add space after opening parenthesis in commands"
+          "description": "Add space after opening parenthesis in commands. Overrides the style preset value when set."
         },
         "cmake-path-resolver.formatting.spaceBeforeCloseParen": {
           "type": "boolean",
-          "default": false,
-          "description": "Add space before closing parenthesis in commands"
+          "description": "Add space before closing parenthesis in commands. Overrides the style preset value when set."
         },
         "cmake-path-resolver.formatting.uppercaseCommands": {
           "type": "boolean",
-          "default": false,
-          "description": "Convert CMake command names to uppercase"
+          "description": "Convert CMake command names to uppercase. Overrides the style preset value when set."
         }
       }
     },
