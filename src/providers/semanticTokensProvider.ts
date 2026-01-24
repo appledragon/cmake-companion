@@ -173,10 +173,9 @@ export class CMakeSemanticTokensProvider implements vscode.DocumentSemanticToken
                     // Cache variable
                     modifiers.push('readonly');
                 }
-            } else {
-                // Unresolved variable - mark as deprecated to show differently
-                // This helps users identify undefined variables
             }
+            // Note: We don't mark undefined variables specially as it could create
+            // false positives for variables defined in included files not yet parsed
             
             // Check if it's a built-in CMake variable
             if (this.isBuiltInVariable(match.variableName)) {

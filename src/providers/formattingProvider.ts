@@ -226,10 +226,13 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
     
     /**
      * Normalize whitespace in the line
+     * Collapses multiple consecutive spaces to a single space outside of quoted strings.
+     * Note: This handles basic cases but may not correctly handle:
+     * - Bracket arguments [[ ... ]]
+     * - Escaped quotes within strings
+     * - Generator expressions with nested content
      */
     private normalizeWhitespace(line: string): string {
-        // Collapse multiple spaces to single space (except in strings)
-        // This is a simple implementation that doesn't handle all edge cases
         let result = '';
         let inString = false;
         let lastChar = '';
@@ -262,16 +265,17 @@ export class CMakeDocumentRangeFormattingProvider implements vscode.DocumentRang
      */
     provideDocumentRangeFormattingEdits(
         document: vscode.TextDocument,
-        range: vscode.Range,
+        _range: vscode.Range,
         options: vscode.FormattingOptions,
         token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.TextEdit[]> {
-        // For simplicity, format the entire document
-        // A more sophisticated implementation would only format the selected range
-        // while maintaining correct indentation relative to the context
+        // Note: Currently formats the entire document for consistency.
+        // Range-only formatting is complex in CMake because indentation depends on
+        // the global context (e.g., being inside an if/foreach block).
+        // A more sophisticated implementation could parse the context and format
+        // only the selected range while maintaining correct relative indentation.
         const fullEdits = this.documentFormatter.provideDocumentFormattingEdits(document, options, token);
         
-        // Return the result directly - it handles null/empty cases
         return fullEdits;
     }
 }
