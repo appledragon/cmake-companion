@@ -10,13 +10,16 @@
   },
   "categories": [
     "Programming Languages",
+    "Formatters",
     "Other"
   ],
   "keywords": [
     "cmake",
     "path",
     "variables",
-    "navigation"
+    "navigation",
+    "syntax highlighting",
+    "formatting"
   ],
   "activationEvents": [
     "onLanguage:cmake",
@@ -58,18 +61,62 @@
           "type": "boolean",
           "default": false,
           "description": "Enable verbose debug logging in the output channel"
+        },
+        "cmake-path-resolver.formatting.maxLineLength": {
+          "type": "number",
+          "default": 0,
+          "description": "Maximum line length for formatting (0 = no limit)"
+        },
+        "cmake-path-resolver.formatting.spaceAfterOpenParen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add space after opening parenthesis in commands"
+        },
+        "cmake-path-resolver.formatting.spaceBeforeCloseParen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add space before closing parenthesis in commands"
+        },
+        "cmake-path-resolver.formatting.uppercaseCommands": {
+          "type": "boolean",
+          "default": false,
+          "description": "Convert CMake command names to uppercase"
         }
       }
     },
     "languages": [
       {
         "id": "cmake",
+        "aliases": ["CMake", "cmake"],
         "extensions": [
           ".cmake"
         ],
         "filenames": [
           "CMakeLists.txt"
-        ]
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cmake",
+        "scopeName": "source.cmake",
+        "path": "./syntaxes/cmake.tmLanguage.json"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "cmake",
+        "scopes": {
+          "variable": ["variable.other.cmake"],
+          "variable.readonly": ["variable.other.constant.cmake"],
+          "variable.defaultLibrary": ["support.variable.cmake"],
+          "function": ["entity.name.function.cmake"],
+          "function.defaultLibrary": ["support.function.cmake"],
+          "keyword": ["keyword.control.cmake"],
+          "namespace": ["entity.name.namespace.cmake"],
+          "property": ["variable.other.property.cmake"]
+        }
       }
     ]
   },

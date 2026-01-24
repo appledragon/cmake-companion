@@ -6,7 +6,16 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CMakeDocumentLinkProvider, CMakeHoverProvider, CMakeDefinitionProvider } from './providers';
+import { 
+    CMakeDocumentLinkProvider, 
+    CMakeHoverProvider, 
+    CMakeDefinitionProvider,
+    CMakeSemanticTokensProvider,
+    CMakeDocumentFormattingProvider,
+    CMakeDocumentRangeFormattingProvider,
+    CMakeOnTypeFormattingProvider,
+    legend
+} from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
 
 // Supported language IDs and file patterns
@@ -66,6 +75,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             new CMakeDefinitionProvider()
         );
         context.subscriptions.push(definitionProvider);
+    }
+    
+    // Register semantic tokens provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const semanticTokensProvider = vscode.languages.registerDocumentSemanticTokensProvider(
+            selector,
+            new CMakeSemanticTokensProvider(),
+            legend
+        );
+        context.subscriptions.push(semanticTokensProvider);
+    }
+    
+    // Register document formatting provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
+            selector,
+            new CMakeDocumentFormattingProvider()
+        );
+        context.subscriptions.push(formattingProvider);
+    }
+    
+    // Register document range formatting provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const rangeFormattingProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(
+            selector,
+            new CMakeDocumentRangeFormattingProvider()
+        );
+        context.subscriptions.push(rangeFormattingProvider);
+    }
+    
+    // Register on-type formatting provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const onTypeFormattingProvider = vscode.languages.registerOnTypeFormattingEditProvider(
+            selector,
+            new CMakeOnTypeFormattingProvider(),
+            CMakeOnTypeFormattingProvider.triggerCharacters[0], // First trigger char
+            ...CMakeOnTypeFormattingProvider.triggerCharacters.slice(1) // Rest of trigger chars
+        );
+        context.subscriptions.push(onTypeFormattingProvider);
     }
     
     // Register commands

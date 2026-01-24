@@ -4,6 +4,9 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 
 ## Features
 
+- **Syntax Highlighting**: Rich syntax highlighting for CMake files including commands, variables, strings, comments, and generator expressions
+- **Semantic Tokens**: Enhanced semantic highlighting that distinguishes between different variable types (built-in, user-defined, environment, cache)
+- **Document Formatting**: Format CMake files with configurable indentation, command casing, and parentheses spacing
 - **Underline Decoration**: CMake paths with variables are underlined and clickable
 - **Hover Tips**: Hover over CMake paths to see the resolved path and file existence status
 - **Click to Navigate**: Ctrl+Click (Cmd+Click on Mac) to jump directly to the resolved file
@@ -30,6 +33,13 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 - **Resolve CMake Path**: Manually resolve a CMake path expression
 - **Refresh CMake Variables**: Re-scan the workspace for CMake variable definitions
 
+### Formatting
+
+To format a CMake document:
+- Right-click and select "Format Document"
+- Use the keyboard shortcut (Shift+Alt+F on Windows/Linux, Shift+Option+F on Mac)
+- Enable "Format on Save" in VS Code settings
+
 ## Configuration
 
 ### Custom Variables
@@ -55,6 +65,24 @@ Configure which file types should have CMake path resolution enabled:
 }
 ```
 
+### Formatting Options
+
+Configure document formatting behavior:
+
+```json
+{
+  "cmake-path-resolver.formatting.maxLineLength": 0,
+  "cmake-path-resolver.formatting.spaceAfterOpenParen": false,
+  "cmake-path-resolver.formatting.spaceBeforeCloseParen": false,
+  "cmake-path-resolver.formatting.uppercaseCommands": false
+}
+```
+
+- `maxLineLength`: Maximum line length (0 = no limit)
+- `spaceAfterOpenParen`: Add space after opening parenthesis in commands
+- `spaceBeforeCloseParen`: Add space before closing parenthesis in commands
+- `uppercaseCommands`: Convert CMake command names to uppercase
+
 ## Built-in Variables
 
 The following CMake built-in variables are automatically set based on your workspace:
@@ -67,6 +95,18 @@ The following CMake built-in variables are automatically set based on your works
 - `PROJECT_BINARY_DIR` - Project build directory
 - `PROJECT_NAME` - Name from project() command
 - `CMAKE_PROJECT_NAME` - Project name
+
+## Syntax Highlighting
+
+The extension provides syntax highlighting for:
+
+- **Commands**: CMake commands like `set()`, `if()`, `add_executable()`, etc.
+- **Variables**: `${VARIABLE}`, `$ENV{VARIABLE}`, `$CACHE{VARIABLE}`
+- **Strings**: Quoted strings with escape sequence support
+- **Comments**: Line comments (`#`) and block comments (`#[[ ]]`)
+- **Generator Expressions**: `$<...>` syntax
+- **Keywords**: CMake keywords like `PUBLIC`, `PRIVATE`, `INTERFACE`, `ON`, `OFF`, etc.
+- **Numbers**: Numeric literals
 
 ## Installation
 
