@@ -70,7 +70,7 @@
         "cmake-path-resolver.formatting.style": {
           "type": "string",
           "enum": ["default", "google"],
-          "default": "default",
+          "default": "google",
           "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
         },
         "cmake-path-resolver.formatting.maxLineLength": {

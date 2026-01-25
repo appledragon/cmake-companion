@@ -138,7 +138,8 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
             
             // Format the line
             const formattedLine = this.formatLine(trimmedLine, indentLevel, formattingOptions);
-            formattedLines.push(formattedLine);
+            const wrappedLines = this.wrapLineIfNeeded(formattedLine, indentLevel, formattingOptions);
+            formattedLines.push(...wrappedLines);
             
             // Increase indent after certain commands
             if (commandName && INDENT_INCREASE_COMMANDS.has(commandName)) {
@@ -170,7 +171,7 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
         const config = vscode.workspace.getConfiguration('cmake-path-resolver');
         
         // Get the style preset (default or google)
-        const style = config.get<CMakeFormattingStyle>('formatting.style', 'default');
+        const style = config.get<CMakeFormattingStyle>('formatting.style', 'google');
         const baseOptions = STYLE_PRESETS[style] || DEFAULT_OPTIONS;
         
         // Allow individual overrides on top of the style preset
@@ -208,6 +209,57 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
         
         // Add indentation
         return this.createIndent(indentLevel, options) + formattedLine;
+    }
+
+    /**
+     * Wrap long lines based on maxLineLength
+     * Only wraps simple command calls like command(arg1 arg2 ...)
+     */
+    private wrapLineIfNeeded(
+        formattedLine: string,
+        indentLevel: number,
+        options: CMakeFormattingOptions
+    ): string[] {
+        if (options.maxLineLength <= 0 || formattedLine.length <= options.maxLineLength) {
+            return [formattedLine];
+        }
+
+        const trimmed = formattedLine.trim();
+        if (!trimmed || trimmed.startsWith('#')) {
+            return [formattedLine];
+        }
+
+        if (this.containsCommentOutsideString(trimmed)) {
+            return [formattedLine];
+        }
+
+        const commandMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
+        if (!commandMatch) {
+            return [formattedLine];
+        }
+
+        const command = commandMatch[1];
+        const argsString = commandMatch[2].trim();
+        if (!argsString) {
+            return [formattedLine];
+        }
+
+        const args = this.splitArguments(argsString);
+        if (args.length <= 1) {
+            return [formattedLine];
+        }
+
+        const baseIndent = this.createIndent(indentLevel, options);
+        const continuationIndent = this.createIndent(indentLevel + 1, options);
+        const wrapped: string[] = [];
+
+        wrapped.push(`${baseIndent}${command}(`);
+        for (const arg of args) {
+            wrapped.push(`${continuationIndent}${arg}`);
+        }
+        wrapped.push(`${baseIndent})`);
+
+        return wrapped;
     }
     
     /**
@@ -287,6 +339,35 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
         }
         
         return result;
+    }
+
+    /**
+     * Split arguments by whitespace while respecting quoted strings
+     */
+    private splitArguments(args: string): string[] {
+        return args.match(/"[^"\\]*(?:\\.[^"\\]*)*"|\S+/g) ?? [];
+    }
+
+    /**
+     * Detect comments outside of quoted strings
+     */
+    private containsCommentOutsideString(line: string): boolean {
+        let inString = false;
+        let lastChar = '';
+
+        for (const char of line) {
+            if (char === '"' && lastChar !== '\\') {
+                inString = !inString;
+            }
+
+            if (!inString && char === '#') {
+                return true;
+            }
+
+            lastChar = char;
+        }
+
+        return false;
     }
 }
 

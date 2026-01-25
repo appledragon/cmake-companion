@@ -99,7 +99,7 @@ Configure document formatting behavior:
 
 ```json
 {
-  "cmake-path-resolver.formatting.style": "default",
+  "cmake-path-resolver.formatting.style": "google",
   "cmake-path-resolver.formatting.maxLineLength": 0,
   "cmake-path-resolver.formatting.spaceAfterOpenParen": false,
   "cmake-path-resolver.formatting.spaceBeforeCloseParen": false,
