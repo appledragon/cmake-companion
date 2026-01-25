@@ -247,14 +247,18 @@ export function deactivate(): void {
 /**
  * Command handler: Convert vcxproj to CMake
  * Converts a Visual Studio project file to CMakeLists.txt
+ * @param uri Optional URI passed when invoked from explorer context menu
  */
-async function convertVcxprojToCMakeHandler(): Promise<void> {
+async function convertVcxprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     
     // Check if there's an active editor with a vcxproj file
     let vcxprojPath: string | undefined;
     
-    if (editor && editor.document.fileName.endsWith('.vcxproj')) {
+    // First check if URI was passed from context menu
+    if (uri && uri.fsPath.endsWith('.vcxproj')) {
+        vcxprojPath = uri.fsPath;
+    } else if (editor && editor.document.fileName.endsWith('.vcxproj')) {
         vcxprojPath = editor.document.fileName;
     } else {
         // Show file picker for vcxproj files

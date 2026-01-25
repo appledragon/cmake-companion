@@ -3,6 +3,20 @@
  * Parses .vcxproj files to extract project configuration for CMake conversion
  */
 
+/**
+ * Precompiled header configuration
+ */
+export interface PchConfig {
+    /** Whether PCH is enabled (has at least one file using PCH) */
+    enabled: boolean;
+    /** The PCH header file (e.g., "pch.h", "stdafx.h") */
+    headerFile?: string;
+    /** The source file that creates the PCH (e.g., "pch.cpp", "stdafx.cpp") */
+    sourceFile?: string;
+    /** Files that are excluded from using PCH (PrecompiledHeader = NotUsing) */
+    excludedFiles: string[];
+}
+
 export interface VcxprojProject {
     name: string;
     type: 'Application' | 'StaticLibrary' | 'DynamicLibrary';
@@ -22,6 +36,8 @@ export interface VcxprojProject {
     characterSet?: string;
     /** Subsystem (e.g., "Console", "Windows") */
     subsystem?: string;
+    /** Precompiled header configuration */
+    pchConfig?: PchConfig;
 }
 
 /**
@@ -158,6 +174,9 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
         project.subsystem = subsystemMatch[1];
     }
 
+    // Parse precompiled header configuration
+    project.pchConfig = parsePchConfig(content);
+
     return project;
 }
 
@@ -197,4 +216,75 @@ function parseLanguageStandard(languageStandard: string): number | undefined {
     
     const normalized = languageStandard.toLowerCase();
     return standardMap[normalized];
+}
+
+/**
+ * Parse precompiled header configuration from vcxproj content
+ * @param content The XML content of the vcxproj file
+ * @returns PCH configuration or undefined if PCH is not used
+ */
+function parsePchConfig(content: string): PchConfig | undefined {
+    const pchConfig: PchConfig = {
+        enabled: false,
+        excludedFiles: []
+    };
+
+    // Extract global PrecompiledHeader setting from ItemDefinitionGroup
+    // This is the default PCH setting applied to all files
+    const globalPchMatch = content.match(/<ItemDefinitionGroup[^>]*>[\s\S]*?<ClCompile>[\s\S]*?<PrecompiledHeader>([^<]+)<\/PrecompiledHeader>/);
+    const hasGlobalPch = globalPchMatch && globalPchMatch[1].trim().toLowerCase() === 'use';
+
+    // Extract global PrecompiledHeaderFile setting
+    const globalPchFileMatch = content.match(/<ItemDefinitionGroup[^>]*>[\s\S]*?<ClCompile>[\s\S]*?<PrecompiledHeaderFile>([^<]+)<\/PrecompiledHeaderFile>/);
+    if (globalPchFileMatch) {
+        pchConfig.headerFile = normalizePathSeparators(globalPchFileMatch[1].trim());
+    }
+
+    // Parse per-file PCH settings from ClCompile elements
+    // Pattern to match ClCompile blocks with Include attribute and content
+    const clCompileBlockRegex = /<ClCompile\s+Include="([^"]+)"\s*>([\s\S]*?)<\/ClCompile>/g;
+    let match;
+
+    while ((match = clCompileBlockRegex.exec(content)) !== null) {
+        const fileName = normalizePathSeparators(match[1]);
+        const blockContent = match[2];
+
+        // Check for PrecompiledHeader setting within this ClCompile block
+        const pchSettingMatch = blockContent.match(/<PrecompiledHeader>([^<]*)<\/PrecompiledHeader>/);
+        if (pchSettingMatch) {
+            const pchSetting = pchSettingMatch[1].trim().toLowerCase();
+
+            if (pchSetting === 'create') {
+                // This file creates the PCH
+                pchConfig.sourceFile = fileName;
+                pchConfig.enabled = true;
+            } else if (pchSetting === 'notusing') {
+                // This file is excluded from PCH
+                if (!pchConfig.excludedFiles.includes(fileName)) {
+                    pchConfig.excludedFiles.push(fileName);
+                }
+            } else if (pchSetting === 'use') {
+                // File explicitly uses PCH
+                pchConfig.enabled = true;
+            }
+        }
+
+        // Also check for per-file PrecompiledHeaderFile setting
+        const pchFileMatch = blockContent.match(/<PrecompiledHeaderFile>([^<]+)<\/PrecompiledHeaderFile>/);
+        if (pchFileMatch && !pchConfig.headerFile) {
+            pchConfig.headerFile = normalizePathSeparators(pchFileMatch[1].trim());
+        }
+    }
+
+    // If global PCH is enabled but no source file found yet, mark as enabled
+    if (hasGlobalPch) {
+        pchConfig.enabled = true;
+    }
+
+    // Only return PCH config if it's actually used
+    if (pchConfig.enabled || pchConfig.sourceFile || pchConfig.headerFile) {
+        return pchConfig;
+    }
+
+    return undefined;
 }
