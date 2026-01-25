@@ -26,6 +26,12 @@ export interface VcxprojProject {
     preprocessorDefinitions: string[];
     libraries: string[];
     outputDirectory?: string;
+    /** Additional compiler options (from AdditionalOptions) */
+    additionalCompileOptions?: string[];
+    /** Additional linker options (from Link/AdditionalOptions) */
+    additionalLinkOptions?: string[];
+    /** Additional library directories (from Link/AdditionalLibraryDirectories) */
+    additionalLibraryDirectories?: string[];
     /** C++ language standard (e.g., 11, 14, 17, 20, 23) */
     cxxStandard?: number;
     /** Windows SDK version (e.g., "10.0.19041.0") */
@@ -36,8 +42,43 @@ export interface VcxprojProject {
     characterSet?: string;
     /** Subsystem (e.g., "Console", "Windows") */
     subsystem?: string;
+    /** Warning level (0-4) */
+    warningLevel?: number;
+    /** Optimization level (Disabled, MinSpace, MaxSpeed, Full) */
+    optimization?: string;
+    /** Debug information format (ProgramDatabase, EditAndContinue, OldStyle) */
+    debugInformationFormat?: string;
+    /** Runtime library (e.g., MultiThreadedDLL, MultiThreadedDebugDLL) */
+    runtimeLibrary?: string;
+    /** Exception handling model (Sync, Async, SyncCThrow) */
+    exceptionHandling?: string;
+    /** Runtime type information (RTTI) */
+    runtimeTypeInfo?: boolean;
+    /** Treat warnings as errors */
+    treatWarningAsError?: boolean;
+    /** Multi-processor compilation */
+    multiProcessorCompilation?: boolean;
     /** Precompiled header configuration */
     pchConfig?: PchConfig;
+    /** Configuration-specific settings (e.g., Debug/Release) */
+    configurations?: Record<string, VcxprojConfigSettings>;
+}
+
+export interface VcxprojConfigSettings {
+    includeDirectories?: string[];
+    preprocessorDefinitions?: string[];
+    libraries?: string[];
+    additionalCompileOptions?: string[];
+    additionalLinkOptions?: string[];
+    additionalLibraryDirectories?: string[];
+    warningLevel?: number;
+    optimization?: string;
+    debugInformationFormat?: string;
+    runtimeLibrary?: string;
+    exceptionHandling?: string;
+    runtimeTypeInfo?: boolean;
+    treatWarningAsError?: boolean;
+    multiProcessorCompilation?: boolean;
 }
 
 /**
@@ -47,6 +88,7 @@ export interface VcxprojProject {
  * @returns Parsed project information
  */
 export function parseVcxproj(content: string, projectPath: string): VcxprojProject {
+    const contentWithoutConditionalItemDefinitionGroups = stripConditionalItemDefinitionGroups(content);
     const project: VcxprojProject = {
         name: extractProjectName(projectPath),
         type: 'Application',
@@ -97,45 +139,21 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
     }
 
     // Extract include directories from AdditionalIncludeDirectories
-    const includeDirsMatches = content.matchAll(/<AdditionalIncludeDirectories>(.*?)<\/AdditionalIncludeDirectories>/g);
-    for (const match of includeDirsMatches) {
-        const dirs = match[1].split(';')
-            .map(d => d.trim())
-            .filter(d => d && d !== '%(AdditionalIncludeDirectories)');
-        for (const dir of dirs) {
-            const normalized = normalizePathSeparators(dir);
-            if (!project.includeDirectories.includes(normalized)) {
-                project.includeDirectories.push(normalized);
-            }
-        }
+    const includeDirs = extractIncludeDirectories(contentWithoutConditionalItemDefinitionGroups);
+    if (includeDirs.length > 0) {
+        project.includeDirectories = includeDirs;
     }
 
     // Extract preprocessor definitions
-    const definesMatches = content.matchAll(/<PreprocessorDefinitions>(.*?)<\/PreprocessorDefinitions>/g);
-    for (const match of definesMatches) {
-        const defs = match[1].split(';')
-            .map(d => d.trim())
-            .filter(d => d && d !== '%(PreprocessorDefinitions)');
-        for (const def of defs) {
-            if (!project.preprocessorDefinitions.includes(def)) {
-                project.preprocessorDefinitions.push(def);
-            }
-        }
+    const definitions = extractPreprocessorDefinitions(contentWithoutConditionalItemDefinitionGroups);
+    if (definitions.length > 0) {
+        project.preprocessorDefinitions = definitions;
     }
 
     // Extract libraries from AdditionalDependencies
-    const libMatches = content.matchAll(/<AdditionalDependencies>(.*?)<\/AdditionalDependencies>/g);
-    for (const match of libMatches) {
-        const libs = match[1].split(';')
-            .map(l => l.trim())
-            .filter(l => l && l !== '%(AdditionalDependencies)');
-        for (const lib of libs) {
-            // Remove .lib extension for CMake
-            const libName = lib.replace(/\.lib$/i, '');
-            if (!project.libraries.includes(libName)) {
-                project.libraries.push(libName);
-            }
-        }
+    const libraries = extractLibraries(contentWithoutConditionalItemDefinitionGroups);
+    if (libraries.length > 0) {
+        project.libraries = libraries;
     }
 
     // Extract output directory
@@ -144,10 +162,79 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
         project.outputDirectory = normalizePathSeparators(outDirMatch[1]);
     }
 
+    // Extract additional compiler options
+    const additionalCompileOptions = extractAdditionalOptions(contentWithoutConditionalItemDefinitionGroups, /<ClCompile>[\s\S]*?<AdditionalOptions>(.*?)<\/AdditionalOptions>[\s\S]*?<\/ClCompile>/g, '%(AdditionalOptions)');
+    if (additionalCompileOptions.length > 0) {
+        project.additionalCompileOptions = additionalCompileOptions;
+    }
+
+    // Extract additional linker options
+    const additionalLinkOptions = extractAdditionalOptions(contentWithoutConditionalItemDefinitionGroups, /<Link>[\s\S]*?<AdditionalOptions>(.*?)<\/AdditionalOptions>[\s\S]*?<\/Link>/g, '%(AdditionalOptions)');
+    if (additionalLinkOptions.length > 0) {
+        project.additionalLinkOptions = additionalLinkOptions;
+    }
+
+    // Extract additional library directories
+    const additionalLibraryDirectories = extractAdditionalLibraryDirectories(contentWithoutConditionalItemDefinitionGroups);
+    if (additionalLibraryDirectories.length > 0) {
+        project.additionalLibraryDirectories = additionalLibraryDirectories;
+    }
+
     // Extract C++ language standard
-    const languageStandardMatch = content.match(/<LanguageStandard>(.*?)<\/LanguageStandard>/);
+    const languageStandardMatch = contentWithoutConditionalItemDefinitionGroups.match(/<LanguageStandard>(.*?)<\/LanguageStandard>/);
     if (languageStandardMatch) {
         project.cxxStandard = parseLanguageStandard(languageStandardMatch[1]);
+    }
+
+    // Extract warning level
+    const warningLevelMatch = contentWithoutConditionalItemDefinitionGroups.match(/<WarningLevel>Level(\d)<\/WarningLevel>/);
+    if (warningLevelMatch) {
+        project.warningLevel = parseInt(warningLevelMatch[1], 10);
+    }
+
+    // Extract optimization level
+    const optimizationMatch = contentWithoutConditionalItemDefinitionGroups.match(/<Optimization>(.*?)<\/Optimization>/);
+    if (optimizationMatch) {
+        project.optimization = optimizationMatch[1].trim();
+    }
+
+    // Extract debug information format
+    const debugInfoMatch = contentWithoutConditionalItemDefinitionGroups.match(/<DebugInformationFormat>(.*?)<\/DebugInformationFormat>/);
+    if (debugInfoMatch) {
+        project.debugInformationFormat = debugInfoMatch[1].trim();
+    }
+
+    // Extract runtime library
+    const runtimeLibraryMatch = contentWithoutConditionalItemDefinitionGroups.match(/<RuntimeLibrary>(.*?)<\/RuntimeLibrary>/);
+    if (runtimeLibraryMatch) {
+        project.runtimeLibrary = parseRuntimeLibrary(runtimeLibraryMatch[1]);
+    }
+
+    // Extract exception handling
+    const exceptionHandlingMatch = contentWithoutConditionalItemDefinitionGroups.match(/<ExceptionHandling>(.*?)<\/ExceptionHandling>/);
+    if (exceptionHandlingMatch) {
+        project.exceptionHandling = exceptionHandlingMatch[1].trim();
+    }
+
+    // Extract RTTI setting
+    const rttiMatch = contentWithoutConditionalItemDefinitionGroups.match(/<RuntimeTypeInfo>(.*?)<\/RuntimeTypeInfo>/);
+    const rttiValue = rttiMatch ? parseBooleanValue(rttiMatch[1]) : undefined;
+    if (rttiValue !== undefined) {
+        project.runtimeTypeInfo = rttiValue;
+    }
+
+    // Extract treat warnings as errors
+    const treatWarningMatch = contentWithoutConditionalItemDefinitionGroups.match(/<TreatWarningAsError>(.*?)<\/TreatWarningAsError>/);
+    const treatWarningValue = treatWarningMatch ? parseBooleanValue(treatWarningMatch[1]) : undefined;
+    if (treatWarningValue !== undefined) {
+        project.treatWarningAsError = treatWarningValue;
+    }
+
+    // Extract multi-processor compilation
+    const mpMatch = contentWithoutConditionalItemDefinitionGroups.match(/<MultiProcessorCompilation>(.*?)<\/MultiProcessorCompilation>/);
+    const mpValue = mpMatch ? parseBooleanValue(mpMatch[1]) : undefined;
+    if (mpValue !== undefined) {
+        project.multiProcessorCompilation = mpValue;
     }
 
     // Extract Windows SDK version
@@ -177,6 +264,12 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
     // Parse precompiled header configuration
     project.pchConfig = parsePchConfig(content);
 
+    // Parse configuration-specific settings
+    const configSettings = parseConfigurationSettings(content);
+    if (Object.keys(configSettings).length > 0) {
+        project.configurations = configSettings;
+    }
+
     return project;
 }
 
@@ -197,6 +290,288 @@ function extractProjectName(projectPath: string): string {
  */
 function normalizePathSeparators(path: string): string {
     return path.replace(/\\/g, '/');
+}
+
+function stripConditionalItemDefinitionGroups(content: string): string {
+    return content.replace(/<ItemDefinitionGroup\s+Condition="[^"]*"[\s\S]*?<\/ItemDefinitionGroup>/g, '');
+}
+
+/**
+ * Parse boolean values from vcxproj
+ * @param value The string value to parse
+ * @returns boolean or undefined if not a valid boolean
+ */
+function parseBooleanValue(value: string): boolean | undefined {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') {
+        return true;
+    }
+    if (normalized === 'false') {
+        return false;
+    }
+    return undefined;
+}
+
+/**
+ * Parse runtime library setting
+ * @param value The RuntimeLibrary value
+ * @returns Normalized runtime library value or undefined
+ */
+function parseRuntimeLibrary(value: string): string | undefined {
+    const normalized = value.trim();
+    const allowed = new Set([
+        'MultiThreaded',
+        'MultiThreadedDLL',
+        'MultiThreadedDebug',
+        'MultiThreadedDebugDLL'
+    ]);
+    return allowed.has(normalized) ? normalized : undefined;
+}
+
+function extractIncludeDirectories(content: string): string[] {
+    const includeDirsMatches = content.matchAll(/<AdditionalIncludeDirectories>(.*?)<\/AdditionalIncludeDirectories>/g);
+    const includeDirs: string[] = [];
+    for (const match of includeDirsMatches) {
+        const dirs = match[1].split(';')
+            .map(d => d.trim())
+            .filter(d => d && d !== '%(AdditionalIncludeDirectories)')
+            .map(normalizePathSeparators);
+        for (const dir of dirs) {
+            if (!includeDirs.includes(dir)) {
+                includeDirs.push(dir);
+            }
+        }
+    }
+    return includeDirs;
+}
+
+function extractPreprocessorDefinitions(content: string): string[] {
+    const definesMatches = content.matchAll(/<PreprocessorDefinitions>(.*?)<\/PreprocessorDefinitions>/g);
+    const definitions: string[] = [];
+    for (const match of definesMatches) {
+        const defs = match[1].split(';')
+            .map(d => d.trim())
+            .filter(d => d && d !== '%(PreprocessorDefinitions)');
+        for (const def of defs) {
+            if (!definitions.includes(def)) {
+                definitions.push(def);
+            }
+        }
+    }
+    return definitions;
+}
+
+function extractLibraries(content: string): string[] {
+    const libMatches = content.matchAll(/<AdditionalDependencies>(.*?)<\/AdditionalDependencies>/g);
+    const libraries: string[] = [];
+    for (const match of libMatches) {
+        const libs = match[1].split(';')
+            .map(l => l.trim())
+            .filter(l => l && l !== '%(AdditionalDependencies)');
+        for (const lib of libs) {
+            const libName = lib.replace(/\.lib$/i, '');
+            if (!libraries.includes(libName)) {
+                libraries.push(libName);
+            }
+        }
+    }
+    return libraries;
+}
+
+function extractAdditionalLibraryDirectories(content: string): string[] {
+    const additionalLibraryDirectoriesMatches = content.matchAll(/<AdditionalLibraryDirectories>(.*?)<\/AdditionalLibraryDirectories>/g);
+    const directories: string[] = [];
+    for (const match of additionalLibraryDirectoriesMatches) {
+        const dirs = match[1].split(';')
+            .map(d => d.trim())
+            .filter(d => d && d !== '%(AdditionalLibraryDirectories)')
+            .map(normalizePathSeparators);
+        for (const dir of dirs) {
+            if (!directories.includes(dir)) {
+                directories.push(dir);
+            }
+        }
+    }
+    return directories;
+}
+
+/**
+ * Extract additional options from XML content
+ * @param content The XML content
+ * @param regex The regex to match option blocks
+ * @param macroToSkip Macro placeholder to skip
+ * @returns List of options
+ */
+function extractAdditionalOptions(content: string, regex: RegExp, macroToSkip: string): string[] {
+    const options: string[] = [];
+    const matches = content.matchAll(regex);
+    for (const match of matches) {
+        const value = match[1];
+        const parsed = parseAdditionalOptionsValue(value, macroToSkip);
+        for (const opt of parsed) {
+            if (!options.includes(opt)) {
+                options.push(opt);
+            }
+        }
+    }
+    return options;
+}
+
+/**
+ * Parse the AdditionalOptions value into tokens
+ * @param value The raw AdditionalOptions value
+ * @param macroToSkip Macro placeholder to skip
+ * @returns Parsed tokens
+ */
+function parseAdditionalOptionsValue(value: string, macroToSkip: string): string[] {
+    const tokens = value.match(/"[^"]+"|\S+/g) ?? [];
+    return tokens
+        .map(token => token.replace(/^"|"$/g, '').trim())
+        .filter(token => token && token !== macroToSkip);
+}
+
+/**
+ * Merge unique strings into an array
+ * @param existing Existing list
+ * @param incoming Incoming list
+ * @returns Merged list
+ */
+function mergeUniqueStrings(existing: string[] | undefined, incoming: string[]): string[] {
+    const merged = existing ? [...existing] : [];
+    for (const item of incoming) {
+        if (!merged.includes(item)) {
+            merged.push(item);
+        }
+    }
+    return merged;
+}
+
+function parseConfigurationSettings(content: string): Record<string, VcxprojConfigSettings> {
+    const configMap: Record<string, VcxprojConfigSettings> = {};
+    const conditionalGroups = content.matchAll(/<ItemDefinitionGroup\s+Condition="([^"]+)"[^>]*>([\s\S]*?)<\/ItemDefinitionGroup>/g);
+
+    for (const match of conditionalGroups) {
+        const condition = match[1];
+        const blockContent = match[2];
+        const configName = extractConfigName(condition);
+        if (!configName) {
+            continue;
+        }
+
+        const settings: VcxprojConfigSettings = {};
+        const includeDirs = extractIncludeDirectories(blockContent);
+        if (includeDirs.length > 0) {
+            settings.includeDirectories = includeDirs;
+        }
+
+        const definitions = extractPreprocessorDefinitions(blockContent);
+        if (definitions.length > 0) {
+            settings.preprocessorDefinitions = definitions;
+        }
+
+        const libraries = extractLibraries(blockContent);
+        if (libraries.length > 0) {
+            settings.libraries = libraries;
+        }
+
+        const additionalCompileOptions = extractAdditionalOptions(blockContent, /<ClCompile>[\s\S]*?<AdditionalOptions>(.*?)<\/AdditionalOptions>[\s\S]*?<\/ClCompile>/g, '%(AdditionalOptions)');
+        if (additionalCompileOptions.length > 0) {
+            settings.additionalCompileOptions = additionalCompileOptions;
+        }
+
+        const additionalLinkOptions = extractAdditionalOptions(blockContent, /<Link>[\s\S]*?<AdditionalOptions>(.*?)<\/AdditionalOptions>[\s\S]*?<\/Link>/g, '%(AdditionalOptions)');
+        if (additionalLinkOptions.length > 0) {
+            settings.additionalLinkOptions = additionalLinkOptions;
+        }
+
+        const additionalLibraryDirectories = extractAdditionalLibraryDirectories(blockContent);
+        if (additionalLibraryDirectories.length > 0) {
+            settings.additionalLibraryDirectories = additionalLibraryDirectories;
+        }
+
+        const warningLevelMatch = blockContent.match(/<WarningLevel>Level(\d)<\/WarningLevel>/);
+        if (warningLevelMatch) {
+            settings.warningLevel = parseInt(warningLevelMatch[1], 10);
+        }
+
+        const optimizationMatch = blockContent.match(/<Optimization>(.*?)<\/Optimization>/);
+        if (optimizationMatch) {
+            settings.optimization = optimizationMatch[1].trim();
+        }
+
+        const debugInfoMatch = blockContent.match(/<DebugInformationFormat>(.*?)<\/DebugInformationFormat>/);
+        if (debugInfoMatch) {
+            settings.debugInformationFormat = debugInfoMatch[1].trim();
+        }
+
+        const runtimeLibraryMatch = blockContent.match(/<RuntimeLibrary>(.*?)<\/RuntimeLibrary>/);
+        if (runtimeLibraryMatch) {
+            settings.runtimeLibrary = parseRuntimeLibrary(runtimeLibraryMatch[1]);
+        }
+
+        const exceptionHandlingMatch = blockContent.match(/<ExceptionHandling>(.*?)<\/ExceptionHandling>/);
+        if (exceptionHandlingMatch) {
+            settings.exceptionHandling = exceptionHandlingMatch[1].trim();
+        }
+
+        const rttiMatch = blockContent.match(/<RuntimeTypeInfo>(.*?)<\/RuntimeTypeInfo>/);
+        const rttiValue = rttiMatch ? parseBooleanValue(rttiMatch[1]) : undefined;
+        if (rttiValue !== undefined) {
+            settings.runtimeTypeInfo = rttiValue;
+        }
+
+        const treatWarningMatch = blockContent.match(/<TreatWarningAsError>(.*?)<\/TreatWarningAsError>/);
+        const treatWarningValue = treatWarningMatch ? parseBooleanValue(treatWarningMatch[1]) : undefined;
+        if (treatWarningValue !== undefined) {
+            settings.treatWarningAsError = treatWarningValue;
+        }
+
+        const mpMatch = blockContent.match(/<MultiProcessorCompilation>(.*?)<\/MultiProcessorCompilation>/);
+        const mpValue = mpMatch ? parseBooleanValue(mpMatch[1]) : undefined;
+        if (mpValue !== undefined) {
+            settings.multiProcessorCompilation = mpValue;
+        }
+
+        if (Object.keys(settings).length > 0) {
+            const existing = configMap[configName];
+            configMap[configName] = existing ? mergeConfigSettings(existing, settings) : settings;
+        }
+    }
+
+    return configMap;
+}
+
+function extractConfigName(condition: string): string | undefined {
+    const configPlatformMatch = condition.match(/'\$\(Configuration\)\|\$\(Platform\)'\s*==\s*'([^|']+)\|[^']+'/);
+    if (configPlatformMatch) {
+        return configPlatformMatch[1];
+    }
+
+    const configOnlyMatch = condition.match(/'\$\(Configuration\)'\s*==\s*'([^']+)'/);
+    if (configOnlyMatch) {
+        return configOnlyMatch[1];
+    }
+
+    return undefined;
+}
+
+function mergeConfigSettings(base: VcxprojConfigSettings, incoming: VcxprojConfigSettings): VcxprojConfigSettings {
+    return {
+        includeDirectories: mergeUniqueStrings(base.includeDirectories, incoming.includeDirectories ?? []),
+        preprocessorDefinitions: mergeUniqueStrings(base.preprocessorDefinitions, incoming.preprocessorDefinitions ?? []),
+        libraries: mergeUniqueStrings(base.libraries, incoming.libraries ?? []),
+        additionalCompileOptions: mergeUniqueStrings(base.additionalCompileOptions, incoming.additionalCompileOptions ?? []),
+        additionalLinkOptions: mergeUniqueStrings(base.additionalLinkOptions, incoming.additionalLinkOptions ?? []),
+        additionalLibraryDirectories: mergeUniqueStrings(base.additionalLibraryDirectories, incoming.additionalLibraryDirectories ?? []),
+        warningLevel: incoming.warningLevel ?? base.warningLevel,
+        optimization: incoming.optimization ?? base.optimization,
+        debugInformationFormat: incoming.debugInformationFormat ?? base.debugInformationFormat,
+        runtimeLibrary: incoming.runtimeLibrary ?? base.runtimeLibrary,
+        exceptionHandling: incoming.exceptionHandling ?? base.exceptionHandling,
+        runtimeTypeInfo: incoming.runtimeTypeInfo ?? base.runtimeTypeInfo,
+        treatWarningAsError: incoming.treatWarningAsError ?? base.treatWarningAsError,
+        multiProcessorCompilation: incoming.multiProcessorCompilation ?? base.multiProcessorCompilation
+    };
 }
 
 /**

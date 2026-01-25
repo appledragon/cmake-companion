@@ -324,6 +324,107 @@ describe('Vcxproj Parser', () => {
             assert.strictEqual(project.subsystem, 'Windows');
         });
 
+        it('should parse additional compiler and linker options', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/bigobj /permissive- %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <AdditionalOptions>/INCREMENTAL:NO /OPT:REF</AdditionalOptions>
+      <AdditionalLibraryDirectories>lib;../libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+
+            assert.strictEqual(project.warningLevel, 4);
+            assert.strictEqual(project.optimization, 'MaxSpeed');
+            assert.strictEqual(project.debugInformationFormat, 'ProgramDatabase');
+            assert.strictEqual(project.runtimeLibrary, 'MultiThreadedDebugDLL');
+            assert.strictEqual(project.exceptionHandling, 'Sync');
+            assert.strictEqual(project.runtimeTypeInfo, true);
+            assert.strictEqual(project.treatWarningAsError, true);
+            assert.strictEqual(project.multiProcessorCompilation, true);
+            assert.ok(project.additionalCompileOptions?.includes('/bigobj'));
+            assert.ok(project.additionalCompileOptions?.includes('/permissive-'));
+            assert.ok(project.additionalLinkOptions?.includes('/INCREMENTAL:NO'));
+            assert.ok(project.additionalLinkOptions?.includes('/OPT:REF'));
+            assert.ok(project.additionalLibraryDirectories?.includes('lib'));
+            assert.ok(project.additionalLibraryDirectories?.includes('../libs'));
+        });
+
+        it('should parse configuration-specific settings', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>DEBUG;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>debug/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>debuglib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/DEBUG:FULL</AdditionalOptions>
+      <AdditionalLibraryDirectories>debug/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>release/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>releaselib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+
+            assert.ok(project.configurations, 'configurations should be defined');
+            const debug = project.configurations?.Debug;
+            const release = project.configurations?.Release;
+
+            assert.ok(debug, 'Debug configuration should be defined');
+            assert.ok(release, 'Release configuration should be defined');
+
+            assert.ok(debug?.preprocessorDefinitions?.includes('DEBUG'));
+            assert.ok(debug?.includeDirectories?.includes('debug/include'));
+            assert.strictEqual(debug?.warningLevel, 4);
+            assert.strictEqual(debug?.optimization, 'Disabled');
+            assert.strictEqual(debug?.debugInformationFormat, 'ProgramDatabase');
+            assert.strictEqual(debug?.runtimeLibrary, 'MultiThreadedDebugDLL');
+            assert.ok(debug?.additionalCompileOptions?.includes('/bigobj'));
+            assert.ok(debug?.additionalLinkOptions?.includes('/DEBUG:FULL'));
+            assert.ok(debug?.additionalLibraryDirectories?.includes('debug/lib'));
+            assert.ok(debug?.libraries?.includes('debuglib'));
+
+            assert.ok(release?.preprocessorDefinitions?.includes('NDEBUG'));
+            assert.ok(release?.includeDirectories?.includes('release/include'));
+            assert.strictEqual(release?.warningLevel, 3);
+            assert.strictEqual(release?.optimization, 'MaxSpeed');
+            assert.strictEqual(release?.runtimeLibrary, 'MultiThreadedDLL');
+            assert.ok(release?.libraries?.includes('releaselib'));
+        });
+
         it('should parse precompiled header with Create setting', () => {
             const content = `<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">

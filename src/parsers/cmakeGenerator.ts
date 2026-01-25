@@ -13,9 +13,18 @@ import { VcxprojProject } from './vcxprojParser';
 export function generateCMakeLists(project: VcxprojProject): string {
     const lines: string[] = [];
 
-    // CMake minimum version - use 3.16 if PCH is used, otherwise 3.10
+    // CMake minimum version - use higher versions for features
     const usesPch = project.pchConfig && project.pchConfig.enabled && project.pchConfig.headerFile;
-    const cmakeMinVersion = usesPch ? '3.16' : '3.10';
+    const usesRuntimeLibrary = !!project.runtimeLibrary || hasConfigRuntimeLibrary(project);
+    const usesLinkOptions = (project.additionalLinkOptions && project.additionalLinkOptions.length > 0) ||
+        (project.additionalLibraryDirectories && project.additionalLibraryDirectories.length > 0) ||
+        hasConfigLinkOptions(project);
+    const cmakeMinVersion = getMaxCMakeVersion([
+        '3.10',
+        usesLinkOptions ? '3.13' : '3.10',
+        usesRuntimeLibrary ? '3.15' : '3.10',
+        usesPch ? '3.16' : '3.10'
+    ]);
     lines.push(`cmake_minimum_required(VERSION ${cmakeMinVersion})`);
     lines.push('');
 
@@ -110,6 +119,8 @@ export function generateCMakeLists(project: VcxprojProject): string {
         lines.push('');
     }
 
+    appendConfigSpecificIncludeDirectories(lines, project);
+
     // Preprocessor definitions
     if (project.preprocessorDefinitions.length > 0) {
         lines.push('# Preprocessor definitions');
@@ -121,6 +132,8 @@ export function generateCMakeLists(project: VcxprojProject): string {
         lines.push('');
     }
 
+    appendConfigSpecificPreprocessorDefinitions(lines, project);
+
     // Libraries
     if (project.libraries.length > 0) {
         lines.push('# Link libraries');
@@ -129,6 +142,56 @@ export function generateCMakeLists(project: VcxprojProject): string {
             lines.push(`    ${lib}`);
         }
         lines.push(')');
+        lines.push('');
+    }
+
+    appendConfigSpecificLibraries(lines, project);
+
+    // Additional library directories
+    if (project.additionalLibraryDirectories && project.additionalLibraryDirectories.length > 0) {
+        lines.push('# Additional library directories');
+        lines.push('target_link_directories(${PROJECT_NAME} PRIVATE');
+        for (const dir of project.additionalLibraryDirectories) {
+            lines.push(`    ${dir}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+
+    appendConfigSpecificLinkDirectories(lines, project);
+
+    // Compiler options
+    const compileOptions = collectCompileOptions(project);
+    if (compileOptions.length > 0) {
+        lines.push('# Compiler options');
+        lines.push('target_compile_options(${PROJECT_NAME} PRIVATE');
+        for (const opt of compileOptions) {
+            lines.push(`    ${formatCompilerOption(opt)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+
+    appendConfigSpecificCompileOptions(lines, project);
+
+    // Linker options
+    if (project.additionalLinkOptions && project.additionalLinkOptions.length > 0) {
+        lines.push('# Linker options');
+        lines.push('target_link_options(${PROJECT_NAME} PRIVATE');
+        for (const opt of project.additionalLinkOptions) {
+            lines.push(`    ${formatLinkerOption(opt)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+
+    appendConfigSpecificLinkOptions(lines, project);
+
+    // MSVC runtime library (requires CMake 3.15+)
+    const runtimeLibraryExpression = buildRuntimeLibraryExpression(project);
+    if (runtimeLibraryExpression) {
+        lines.push('# MSVC runtime library');
+        lines.push(`set_property(TARGET \${PROJECT_NAME} PROPERTY MSVC_RUNTIME_LIBRARY "${runtimeLibraryExpression}")`);
         lines.push('');
     }
 
@@ -172,4 +235,346 @@ export function generateCMakeLists(project: VcxprojProject): string {
     }
 
     return lines.join('\n');
+}
+
+/**
+ * Collect compiler options derived from project settings
+ * @param project Parsed project settings
+ * @returns List of compiler options
+ */
+function collectCompileOptions(project: VcxprojProject): string[] {
+    const options: string[] = [];
+
+    if (project.warningLevel !== undefined) {
+        options.push(`/W${project.warningLevel}`);
+    }
+
+    if (project.optimization) {
+        const flag = mapOptimizationToFlag(project.optimization);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (project.debugInformationFormat) {
+        const flag = mapDebugInfoToFlag(project.debugInformationFormat);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (project.exceptionHandling) {
+        const flag = mapExceptionHandlingToFlag(project.exceptionHandling);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (project.runtimeTypeInfo !== undefined) {
+        options.push(project.runtimeTypeInfo ? '/GR' : '/GR-');
+    }
+
+    if (project.treatWarningAsError) {
+        options.push('/WX');
+    }
+
+    if (project.multiProcessorCompilation) {
+        options.push('/MP');
+    }
+
+    if (project.additionalCompileOptions && project.additionalCompileOptions.length > 0) {
+        for (const opt of project.additionalCompileOptions) {
+            options.push(opt);
+        }
+    }
+
+    return uniqueOptions(options);
+}
+
+function collectCompileOptionsFromConfig(settings: NonNullable<VcxprojProject['configurations']>[string]): string[] {
+    const options: string[] = [];
+
+    if (settings.warningLevel !== undefined) {
+        options.push(`/W${settings.warningLevel}`);
+    }
+
+    if (settings.optimization) {
+        const flag = mapOptimizationToFlag(settings.optimization);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (settings.debugInformationFormat) {
+        const flag = mapDebugInfoToFlag(settings.debugInformationFormat);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (settings.exceptionHandling) {
+        const flag = mapExceptionHandlingToFlag(settings.exceptionHandling);
+        if (flag) {
+            options.push(flag);
+        }
+    }
+
+    if (settings.runtimeTypeInfo !== undefined) {
+        options.push(settings.runtimeTypeInfo ? '/GR' : '/GR-');
+    }
+
+    if (settings.treatWarningAsError) {
+        options.push('/WX');
+    }
+
+    if (settings.multiProcessorCompilation) {
+        options.push('/MP');
+    }
+
+    if (settings.additionalCompileOptions && settings.additionalCompileOptions.length > 0) {
+        for (const opt of settings.additionalCompileOptions) {
+            options.push(opt);
+        }
+    }
+
+    return uniqueOptions(options);
+}
+
+function uniqueOptions(options: string[]): string[] {
+    const unique: string[] = [];
+    for (const opt of options) {
+        if (!unique.includes(opt)) {
+            unique.push(opt);
+        }
+    }
+    return unique;
+}
+
+function mapOptimizationToFlag(value: string): string | undefined {
+    switch (value) {
+        case 'Disabled':
+            return '/Od';
+        case 'MinSpace':
+            return '/O1';
+        case 'MaxSpeed':
+            return '/O2';
+        case 'Full':
+            return '/Ox';
+        default:
+            return undefined;
+    }
+}
+
+function mapDebugInfoToFlag(value: string): string | undefined {
+    switch (value) {
+        case 'ProgramDatabase':
+            return '/Zi';
+        case 'EditAndContinue':
+            return '/ZI';
+        case 'OldStyle':
+            return '/Z7';
+        default:
+            return undefined;
+    }
+}
+
+function mapExceptionHandlingToFlag(value: string): string | undefined {
+    switch (value) {
+        case 'Sync':
+            return '/EHsc';
+        case 'Async':
+            return '/EHa';
+        case 'SyncCThrow':
+            return '/EHs';
+        default:
+            return undefined;
+    }
+}
+
+function formatCompilerOption(option: string): string {
+    return option.startsWith('/')
+        ? `$<$<CXX_COMPILER_ID:MSVC>:${option}>`
+        : option;
+}
+
+function formatLinkerOption(option: string): string {
+    return option.startsWith('/')
+        ? `$<$<CXX_COMPILER_ID:MSVC>:${option}>`
+        : option;
+}
+
+function wrapConfigExpression(config: string, value: string): string {
+    return `$<$<CONFIG:${config}>:${value}>`;
+}
+
+function appendConfigSpecificIncludeDirectories(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        if (!settings.includeDirectories || settings.includeDirectories.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Include directories (${config})`);
+        lines.push('target_include_directories(${PROJECT_NAME} PRIVATE');
+        for (const dir of settings.includeDirectories) {
+            lines.push(`    ${wrapConfigExpression(config, dir)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function appendConfigSpecificPreprocessorDefinitions(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        if (!settings.preprocessorDefinitions || settings.preprocessorDefinitions.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Preprocessor definitions (${config})`);
+        lines.push('target_compile_definitions(${PROJECT_NAME} PRIVATE');
+        for (const def of settings.preprocessorDefinitions) {
+            lines.push(`    ${wrapConfigExpression(config, def)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function appendConfigSpecificLibraries(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        if (!settings.libraries || settings.libraries.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Link libraries (${config})`);
+        lines.push('target_link_libraries(${PROJECT_NAME} PRIVATE');
+        for (const lib of settings.libraries) {
+            lines.push(`    ${wrapConfigExpression(config, lib)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function appendConfigSpecificLinkDirectories(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        if (!settings.additionalLibraryDirectories || settings.additionalLibraryDirectories.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Additional library directories (${config})`);
+        lines.push('target_link_directories(${PROJECT_NAME} PRIVATE');
+        for (const dir of settings.additionalLibraryDirectories) {
+            lines.push(`    ${wrapConfigExpression(config, dir)}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function appendConfigSpecificCompileOptions(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        const options = collectCompileOptionsFromConfig(settings);
+        if (options.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Compiler options (${config})`);
+        lines.push('target_compile_options(${PROJECT_NAME} PRIVATE');
+        for (const opt of options) {
+            lines.push(`    ${wrapConfigExpression(config, formatCompilerOption(opt))}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function appendConfigSpecificLinkOptions(lines: string[], project: VcxprojProject): void {
+    if (!project.configurations) {
+        return;
+    }
+
+    for (const [config, settings] of Object.entries(project.configurations)) {
+        if (!settings.additionalLinkOptions || settings.additionalLinkOptions.length === 0) {
+            continue;
+        }
+
+        lines.push(`# Linker options (${config})`);
+        lines.push('target_link_options(${PROJECT_NAME} PRIVATE');
+        for (const opt of settings.additionalLinkOptions) {
+            lines.push(`    ${wrapConfigExpression(config, formatLinkerOption(opt))}`);
+        }
+        lines.push(')');
+        lines.push('');
+    }
+}
+
+function buildRuntimeLibraryExpression(project: VcxprojProject): string | undefined {
+    const parts: string[] = [];
+    if (project.runtimeLibrary) {
+        parts.push(project.runtimeLibrary);
+    }
+
+    if (project.configurations) {
+        for (const [config, settings] of Object.entries(project.configurations)) {
+            if (settings.runtimeLibrary) {
+                parts.push(wrapConfigExpression(config, settings.runtimeLibrary));
+            }
+        }
+    }
+
+    return parts.length > 0 ? parts.join('') : undefined;
+}
+
+function hasConfigRuntimeLibrary(project: VcxprojProject): boolean {
+    if (!project.configurations) {
+        return false;
+    }
+
+    return Object.values(project.configurations).some(settings => !!settings.runtimeLibrary);
+}
+
+function hasConfigLinkOptions(project: VcxprojProject): boolean {
+    if (!project.configurations) {
+        return false;
+    }
+
+    return Object.values(project.configurations).some(settings =>
+        (settings.additionalLinkOptions && settings.additionalLinkOptions.length > 0) ||
+        (settings.additionalLibraryDirectories && settings.additionalLibraryDirectories.length > 0)
+    );
+}
+
+function getMaxCMakeVersion(versions: string[]): string {
+    let maxMajor = 0;
+    let maxMinor = 0;
+    for (const version of versions) {
+        const [majorStr, minorStr] = version.split('.');
+        const major = parseInt(majorStr, 10);
+        const minor = parseInt(minorStr ?? '0', 10);
+        if (major > maxMajor || (major === maxMajor && minor > maxMinor)) {
+            maxMajor = major;
+            maxMinor = minor;
+        }
+    }
+    return `${maxMajor}.${maxMinor}`;
 }

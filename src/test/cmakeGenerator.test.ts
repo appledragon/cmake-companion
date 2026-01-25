@@ -349,6 +349,114 @@ describe('CMake Generator', () => {
             assert.ok(cmake.includes('set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)'));
         });
 
+        it('should generate compiler and linker options', () => {
+            const project: VcxprojProject = {
+                name: 'OptionsApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                warningLevel: 4,
+                optimization: 'MaxSpeed',
+                debugInformationFormat: 'ProgramDatabase',
+                exceptionHandling: 'Sync',
+                runtimeTypeInfo: true,
+                treatWarningAsError: true,
+                multiProcessorCompilation: true,
+                additionalCompileOptions: ['/bigobj'],
+                additionalLinkOptions: ['/INCREMENTAL:NO'],
+                additionalLibraryDirectories: ['lib'],
+                runtimeLibrary: 'MultiThreadedDebugDLL'
+            };
+
+            const cmake = generateCMakeLists(project);
+
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.15)'));
+            assert.ok(cmake.includes('target_compile_options(${PROJECT_NAME} PRIVATE'));
+            assert.ok(cmake.includes('/W4'));
+            assert.ok(cmake.includes('/O2'));
+            assert.ok(cmake.includes('/Zi'));
+            assert.ok(cmake.includes('/EHsc'));
+            assert.ok(cmake.includes('/GR'));
+            assert.ok(cmake.includes('/WX'));
+            assert.ok(cmake.includes('/MP'));
+            assert.ok(cmake.includes('/bigobj'));
+            assert.ok(cmake.includes('target_link_options(${PROJECT_NAME} PRIVATE'));
+            assert.ok(cmake.includes('/INCREMENTAL:NO'));
+            assert.ok(cmake.includes('target_link_directories(${PROJECT_NAME} PRIVATE'));
+            assert.ok(cmake.includes('lib'));
+            assert.ok(cmake.includes('MSVC_RUNTIME_LIBRARY'));
+            assert.ok(cmake.includes('MultiThreadedDebugDLL'));
+        });
+
+        it('should generate configuration-specific settings', () => {
+            const project: VcxprojProject = {
+                name: 'ConfigApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                configurations: {
+                    Debug: {
+                        includeDirectories: ['debug/include'],
+                        preprocessorDefinitions: ['DEBUG'],
+                        libraries: ['debuglib'],
+                        additionalCompileOptions: ['/bigobj'],
+                        additionalLinkOptions: ['/DEBUG:FULL'],
+                        additionalLibraryDirectories: ['debug/lib'],
+                        warningLevel: 4,
+                        optimization: 'Disabled',
+                        debugInformationFormat: 'ProgramDatabase',
+                        runtimeLibrary: 'MultiThreadedDebugDLL'
+                    },
+                    Release: {
+                        includeDirectories: ['release/include'],
+                        preprocessorDefinitions: ['NDEBUG'],
+                        libraries: ['releaselib'],
+                        warningLevel: 3,
+                        optimization: 'MaxSpeed',
+                        runtimeLibrary: 'MultiThreadedDLL'
+                    }
+                }
+            };
+
+            const cmake = generateCMakeLists(project);
+
+            assert.ok(cmake.includes('# Include directories (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:debug/include>'));
+            assert.ok(cmake.includes('# Preprocessor definitions (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:DEBUG>'));
+            assert.ok(cmake.includes('# Link libraries (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:debuglib>'));
+            assert.ok(cmake.includes('# Compiler options (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/W4>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/Od>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/Zi>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/bigobj>>'));
+            assert.ok(cmake.includes('# Linker options (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/DEBUG:FULL>>'));
+            assert.ok(cmake.includes('# Additional library directories (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:debug/lib>'));
+
+            assert.ok(cmake.includes('# Include directories (Release)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:release/include>'));
+            assert.ok(cmake.includes('# Preprocessor definitions (Release)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:NDEBUG>'));
+            assert.ok(cmake.includes('# Link libraries (Release)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:releaselib>'));
+            assert.ok(cmake.includes('# Compiler options (Release)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/W3>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2>>'));
+
+            assert.ok(cmake.includes('MSVC_RUNTIME_LIBRARY'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:MultiThreadedDebugDLL>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:MultiThreadedDLL>'));
+        });
+
         it('should generate precompiled headers configuration', () => {
             const project: VcxprojProject = {
                 name: 'MyApp',
