@@ -91,6 +91,21 @@ export function parseVariables(text: string): CMakeVariableMatch[] {
 }
 
 /**
+ * Check if two ranges overlap
+ * @param range1 First range with start and end
+ * @param range2 Second range with start and end
+ * @returns True if ranges overlap
+ */
+function checkRangeOverlap(
+    range1: { start: number; end: number },
+    range2: { start: number; end: number }
+): boolean {
+    return (range1.start >= range2.start && range1.start < range2.end) ||
+           (range1.end > range2.start && range1.end <= range2.end) ||
+           (range1.start <= range2.start && range1.end >= range2.end);
+}
+
+/**
  * Parse all CMake path expressions from text
  * @param text The text to parse
  * @returns Array of path matches
@@ -130,17 +145,18 @@ export function parsePaths(text: string): CMakePathMatch[] {
         }
         
         // Calculate the actual start position of the path in the text
-        // match[0] includes the prefix (space, quote, etc.), so we find where fullPath starts
-        const prefixLength = match[0].indexOf(fullPath);
-        const startIndex = match.index + prefixLength;
-        const endIndex = startIndex + fullPath.length;
+        // match[0] includes the prefix (space, quote, etc.)
+        // We need to find where fullPath actually starts in the original text
+        // Since fullPath is captured, we know match[0] ends with the captured text
+        // or has it followed by lookahead (which doesn't consume characters)
+        const fullMatch = match[0];
+        const matchEnd = match.index + fullMatch.length;
+        const startIndex = matchEnd - fullPath.length;
+        const endIndex = matchEnd;
         
         // Check if this range overlaps with any already matched variable paths
-        const overlaps = matchedRanges.some(
-            range => (startIndex >= range.start && startIndex < range.end) ||
-                     (endIndex > range.start && endIndex <= range.end) ||
-                     (startIndex <= range.start && endIndex >= range.end)
-        );
+        const currentRange = { start: startIndex, end: endIndex };
+        const overlaps = matchedRanges.some(range => checkRangeOverlap(currentRange, range));
         
         if (!overlaps) {
             matches.push({
@@ -150,7 +166,7 @@ export function parsePaths(text: string): CMakePathMatch[] {
                 endIndex
             });
             
-            matchedRanges.push({ start: startIndex, end: endIndex });
+            matchedRanges.push(currentRange);
         }
     }
     
