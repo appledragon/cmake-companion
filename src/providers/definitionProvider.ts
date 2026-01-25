@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parsePaths } from '../parsers';
+import { parsePaths, CMakePathMatch } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
 export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
@@ -47,7 +47,7 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
      */
     private getPathDefinition(
         document: vscode.TextDocument,
-        match: { fullPath: string; startIndex: number; endIndex: number; variables: import('../parsers/cmakeVariableParser').CMakeVariableMatch[] }
+        match: CMakePathMatch
     ): vscode.Definition | null {
         const resolver = getVariableResolver();
         const documentDir = path.dirname(document.uri.fsPath);
@@ -63,8 +63,8 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
             if (!path.isAbsolute(match.fullPath)) {
                 absolutePath = path.resolve(documentDir, match.fullPath);
             }
-            // Normalize the path
-            absolutePath = absolutePath.replace(/\\/g, '/');
+            // Normalize the path for cross-platform compatibility
+            absolutePath = path.normalize(absolutePath);
             
             // Check if the file exists
             let exists = false;

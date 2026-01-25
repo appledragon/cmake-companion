@@ -40,13 +40,29 @@ const CMAKE_PATH_REGEX = /\$\{[A-Za-z_][A-Za-z0-9_]*\}(?:(?:\/|\\)[A-Za-z0-9_.@\
 
 /**
  * Regular expression to match plain file paths (without variables)
- * Matches:
+ * 
+ * Pattern breakdown:
+ * 1. Prefix: (?:^|[\s"'(]) - Match start of string or delimiter (space, quote, paren)
+ * 2. Path capture group with two alternatives:
+ *    a) Paths with directory prefix:
+ *       - \.\.?\/ matches ./ or ../
+ *       - [A-Za-z]:[\\/] matches Windows drive (C:\ or C:/)
+ *       - \/ matches absolute Unix paths
+ *       - [A-Za-z0-9_.-/\\]* matches path segments
+ *       - \.[A-Za-z0-9]+ matches file extension
+ *    b) Simple filenames or relative paths:
+ *       - [A-Za-z0-9_-] matches first character
+ *       - [A-Za-z0-9_.-]* matches rest of filename/path
+ *       - (?:\/[A-Za-z0-9_.-/\\]*)? optional directory components
+ *       - \.(?:cpp|h|hpp|...) matches known file extensions
+ * 3. Suffix: (?=[\s"')]|$) - Lookahead for delimiter or end of string
+ * 
+ * Supported formats:
  * - Simple filenames: file.cpp, header.h
- * - Relative paths: src/file.cpp, ./src/file.cpp, ../src/file.cpp
+ * - Relative paths: src/file.cpp, include/utils.h
+ * - Paths with dots: ./src/file.cpp, ../include/header.h
  * - Absolute paths: /absolute/path/file.cpp, C:/Windows/path/file.cpp
- * Requirements:
- * - Must contain a file extension (.cpp, .h, .txt, etc.)
- * - Filename must start with alphanumeric or underscore
+ * - Only matches files with known extensions to avoid false positives
  */
 const PLAIN_FILE_PATH_REGEX = /(?:^|[\s"'(])((?:\.\.?\/|[A-Za-z]:[\\/]|\/)[A-Za-z0-9_.-/\\]*\.[A-Za-z0-9]+|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_.-/\\]*)?\.(?:cpp|h|hpp|c|cc|cxx|hxx|txt|cmake|md|py|js|ts|json|xml|yml|yaml|sh|bat|cmd))(?=[\s"')]|$)/g;
 
@@ -114,9 +130,10 @@ export function parsePaths(text: string): CMakePathMatch[] {
         }
         
         // Calculate the actual start position of the path in the text
-        const matchStart = match.index + (match[0].length - fullPath.length - 1);
-        const startIndex = matchStart;
-        const endIndex = matchStart + fullPath.length;
+        // match[0] includes the prefix (space, quote, etc.), so we find where fullPath starts
+        const prefixLength = match[0].indexOf(fullPath);
+        const startIndex = match.index + prefixLength;
+        const endIndex = startIndex + fullPath.length;
         
         // Check if this range overlaps with any already matched variable paths
         const overlaps = matchedRanges.some(

@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { parsePaths, parseVariables } from '../parsers';
+import { parsePaths, parseVariables, CMakePathMatch } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
 export class CMakeHoverProvider implements vscode.HoverProvider {
@@ -60,7 +60,7 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
      */
     private createPathHover(
         document: vscode.TextDocument,
-        match: { fullPath: string; startIndex: number; endIndex: number; variables: import('../parsers/cmakeVariableParser').CMakeVariableMatch[] }
+        match: CMakePathMatch
     ): vscode.Hover {
         const resolver = getVariableResolver();
         const documentDir = path.dirname(document.uri.fsPath);
@@ -76,8 +76,8 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
             if (!path.isAbsolute(match.fullPath)) {
                 absolutePath = path.resolve(documentDir, match.fullPath);
             }
-            // Normalize the path
-            absolutePath = absolutePath.replace(/\\/g, '/');
+            // Normalize the path for cross-platform compatibility
+            absolutePath = path.normalize(absolutePath);
             
             // Check if the file exists
             let exists = false;

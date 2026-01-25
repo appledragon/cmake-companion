@@ -44,8 +44,8 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
                 if (!path.isAbsolute(match.fullPath)) {
                     absolutePath = path.resolve(documentDir, match.fullPath);
                 }
-                // Normalize the path
-                absolutePath = absolutePath.replace(/\\/g, '/');
+                // Normalize the path for cross-platform compatibility
+                absolutePath = path.normalize(absolutePath);
                 
                 // Check if the file exists
                 let exists = false;
