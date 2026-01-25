@@ -150,5 +150,178 @@ describe('Vcxproj Parser', () => {
             assert.strictEqual(project.sourceFiles.length, 1);
             assert.strictEqual(project.sourceFiles[0], 'main.cpp');
         });
+
+        it('should parse C++ language standard (stdcpp14)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.cxxStandard, 14);
+        });
+
+        it('should parse C++ language standard (stdcpp17)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.cxxStandard, 17);
+        });
+
+        it('should parse C++ language standard (stdcpp20)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.cxxStandard, 20);
+        });
+
+        it('should parse C++ language standard (stdcpplatest as 23)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.cxxStandard, 23);
+        });
+
+        it('should parse Windows SDK version', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.windowsSdkVersion, '10.0.19041.0');
+        });
+
+        it('should parse platform toolset', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Configuration">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.platformToolset, 'v142');
+        });
+
+        it('should parse character set (Unicode)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Configuration">
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.characterSet, 'Unicode');
+        });
+
+        it('should parse character set (MultiByte)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Configuration">
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.characterSet, 'MultiByte');
+        });
+
+        it('should parse subsystem (Console)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.subsystem, 'Console');
+        });
+
+        it('should parse subsystem (Windows)', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.subsystem, 'Windows');
+        });
+
+        it('should parse all extended properties together', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.type, 'Application');
+            assert.strictEqual(project.cxxStandard, 20);
+            assert.strictEqual(project.windowsSdkVersion, '10.0.22000.0');
+            assert.strictEqual(project.platformToolset, 'v143');
+            assert.strictEqual(project.characterSet, 'Unicode');
+            assert.strictEqual(project.subsystem, 'Windows');
+        });
     });
 });

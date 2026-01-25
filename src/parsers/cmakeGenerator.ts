@@ -21,11 +21,36 @@ export function generateCMakeLists(project: VcxprojProject): string {
     lines.push(`project(${project.name})`);
     lines.push('');
 
-    // C++ standard (commonly used)
+    // C++ standard (use parsed value or default to 17)
+    const cxxStandard = project.cxxStandard ?? 17;
     lines.push('# Set C++ standard');
-    lines.push('set(CMAKE_CXX_STANDARD 17)');
+    lines.push(`set(CMAKE_CXX_STANDARD ${cxxStandard})`);
     lines.push('set(CMAKE_CXX_STANDARD_REQUIRED ON)');
     lines.push('');
+
+    // Windows SDK version (if specified)
+    if (project.windowsSdkVersion) {
+        lines.push('# Windows SDK version');
+        lines.push(`set(CMAKE_SYSTEM_VERSION ${project.windowsSdkVersion})`);
+        lines.push('');
+    }
+
+    // Platform toolset comment (informational, as CMake handles this differently)
+    if (project.platformToolset) {
+        lines.push(`# Original Visual Studio platform toolset: ${project.platformToolset}`);
+        lines.push('');
+    }
+
+    // Character set
+    if (project.characterSet === 'Unicode') {
+        lines.push('# Unicode character set');
+        lines.push('add_definitions(-DUNICODE -D_UNICODE)');
+        lines.push('');
+    } else if (project.characterSet === 'MultiByte') {
+        lines.push('# Multi-byte character set');
+        lines.push('add_definitions(-D_MBCS)');
+        lines.push('');
+    }
 
     // Collect all source files (both .cpp and .h)
     const allFiles = [...project.sourceFiles, ...project.headerFiles];
@@ -102,6 +127,19 @@ export function generateCMakeLists(project: VcxprojProject): string {
             lines.push(`    ${lib}`);
         }
         lines.push(')');
+        lines.push('');
+    }
+
+    // Subsystem (Windows-specific linker flag)
+    if (project.subsystem && project.type === 'Application') {
+        lines.push('# Windows subsystem');
+        if (project.subsystem === 'Windows') {
+            lines.push('if(WIN32)');
+            lines.push('    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)');
+            lines.push('endif()');
+        } else if (project.subsystem === 'Console') {
+            lines.push('# Console application (default on Windows)');
+        }
         lines.push('');
     }
 

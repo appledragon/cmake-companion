@@ -12,6 +12,16 @@ export interface VcxprojProject {
     preprocessorDefinitions: string[];
     libraries: string[];
     outputDirectory?: string;
+    /** C++ language standard (e.g., 11, 14, 17, 20, 23) */
+    cxxStandard?: number;
+    /** Windows SDK version (e.g., "10.0.19041.0") */
+    windowsSdkVersion?: string;
+    /** Platform toolset (e.g., "v142", "v143") */
+    platformToolset?: string;
+    /** Character set (e.g., "Unicode", "MultiByte") */
+    characterSet?: string;
+    /** Subsystem (e.g., "Console", "Windows") */
+    subsystem?: string;
 }
 
 /**
@@ -118,6 +128,36 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
         project.outputDirectory = normalizePathSeparators(outDirMatch[1]);
     }
 
+    // Extract C++ language standard
+    const languageStandardMatch = content.match(/<LanguageStandard>(.*?)<\/LanguageStandard>/);
+    if (languageStandardMatch) {
+        project.cxxStandard = parseLanguageStandard(languageStandardMatch[1]);
+    }
+
+    // Extract Windows SDK version
+    const sdkVersionMatch = content.match(/<WindowsTargetPlatformVersion>(.*?)<\/WindowsTargetPlatformVersion>/);
+    if (sdkVersionMatch) {
+        project.windowsSdkVersion = sdkVersionMatch[1];
+    }
+
+    // Extract platform toolset
+    const platformToolsetMatch = content.match(/<PlatformToolset>(.*?)<\/PlatformToolset>/);
+    if (platformToolsetMatch) {
+        project.platformToolset = platformToolsetMatch[1];
+    }
+
+    // Extract character set
+    const characterSetMatch = content.match(/<CharacterSet>(.*?)<\/CharacterSet>/);
+    if (characterSetMatch) {
+        project.characterSet = characterSetMatch[1];
+    }
+
+    // Extract subsystem from Link settings
+    const subsystemMatch = content.match(/<SubSystem>(.*?)<\/SubSystem>/);
+    if (subsystemMatch) {
+        project.subsystem = subsystemMatch[1];
+    }
+
     return project;
 }
 
@@ -138,4 +178,23 @@ function extractProjectName(projectPath: string): string {
  */
 function normalizePathSeparators(path: string): string {
     return path.replace(/\\/g, '/');
+}
+
+/**
+ * Parse Visual Studio language standard to numeric C++ standard version
+ * @param languageStandard The LanguageStandard value from vcxproj (e.g., "stdcpp14", "stdcpp17", "stdcpp20", "stdcpplatest")
+ * @returns Numeric C++ standard version (e.g., 14, 17, 20, 23) or undefined if not recognized
+ */
+function parseLanguageStandard(languageStandard: string): number | undefined {
+    const standardMap: Record<string, number> = {
+        'stdcpp11': 11,
+        'stdcpp14': 14,
+        'stdcpp17': 17,
+        'stdcpp20': 20,
+        'stdcpp23': 23,
+        'stdcpplatest': 23  // Map 'latest' to C++23 as a reasonable default
+    };
+    
+    const normalized = languageStandard.toLowerCase();
+    return standardMap[normalized];
 }

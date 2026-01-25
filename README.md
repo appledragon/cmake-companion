@@ -57,6 +57,11 @@ The conversion automatically extracts:
 - Include directories
 - Preprocessor definitions
 - Library dependencies
+- C++ language standard (CMAKE_CXX_STANDARD from LanguageStandard)
+- Windows SDK version (CMAKE_SYSTEM_VERSION from WindowsTargetPlatformVersion)
+- Platform toolset (informational comment)
+- Character set (UNICODE/_UNICODE or _MBCS definitions)
+- Subsystem (WIN32_EXECUTABLE property for Windows GUI applications)
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
 
