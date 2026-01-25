@@ -4,6 +4,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { parsePaths, parseVariables } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
@@ -58,10 +60,40 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
      */
     private createPathHover(
         document: vscode.TextDocument,
-        match: { fullPath: string; startIndex: number; endIndex: number }
+        match: { fullPath: string; startIndex: number; endIndex: number; variables: import('../parsers/cmakeVariableParser').CMakeVariableMatch[] }
     ): vscode.Hover {
         const resolver = getVariableResolver();
-        const resolved = resolver.resolvePath(match.fullPath);
+        const documentDir = path.dirname(document.uri.fsPath);
+        
+        let resolved;
+        
+        // If the path has variables, use the resolver
+        if (match.variables && match.variables.length > 0) {
+            resolved = resolver.resolvePath(match.fullPath);
+        } else {
+            // For plain file paths, resolve relative to the document directory
+            let absolutePath = match.fullPath;
+            if (!path.isAbsolute(match.fullPath)) {
+                absolutePath = path.resolve(documentDir, match.fullPath);
+            }
+            // Normalize the path
+            absolutePath = absolutePath.replace(/\\/g, '/');
+            
+            // Check if the file exists
+            let exists = false;
+            try {
+                exists = fs.existsSync(absolutePath);
+            } catch {
+                // Ignore errors
+            }
+            
+            resolved = {
+                original: match.fullPath,
+                resolved: absolutePath,
+                exists,
+                unresolvedVariables: []
+            };
+        }
         
         const markdown = new vscode.MarkdownString();
         markdown.isTrusted = true;

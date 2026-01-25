@@ -26,13 +26,42 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
         const text = document.getText();
         const pathMatches = parsePaths(text);
         const resolver = getVariableResolver();
+        const documentDir = path.dirname(document.uri.fsPath);
         
         for (const match of pathMatches) {
             if (token.isCancellationRequested) {
                 return links;
             }
             
-            const resolved = resolver.resolvePath(match.fullPath);
+            let resolved;
+            
+            // If the path has variables, use the resolver
+            if (match.variables.length > 0) {
+                resolved = resolver.resolvePath(match.fullPath);
+            } else {
+                // For plain file paths, resolve relative to the document directory
+                let absolutePath = match.fullPath;
+                if (!path.isAbsolute(match.fullPath)) {
+                    absolutePath = path.resolve(documentDir, match.fullPath);
+                }
+                // Normalize the path
+                absolutePath = absolutePath.replace(/\\/g, '/');
+                
+                // Check if the file exists
+                let exists = false;
+                try {
+                    exists = fs.existsSync(absolutePath);
+                } catch {
+                    // Ignore errors
+                }
+                
+                resolved = {
+                    original: match.fullPath,
+                    resolved: absolutePath,
+                    exists,
+                    unresolvedVariables: []
+                };
+            }
             
             // Only create links for paths that can be fully resolved
             if (resolved.unresolvedVariables.length === 0) {
