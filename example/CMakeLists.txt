@@ -1,34 +1,43 @@
 cmake_minimum_required(VERSION 3.10)
-project(ExampleProject)
 
+project(SampleApp)
+
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Define custom variables
-set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
-set(SRC_DIR ${PROJECT_ROOT}/src)
-set(INCLUDE_DIR ${PROJECT_ROOT}/include)
-set(BUILD_DIR ${PROJECT_ROOT}/build)
-set(THIRD_PARTY ${PROJECT_ROOT}/third_party)
+# Source files
+set(SOURCES
+    src/main.cpp
+    src/graphics.cpp
+    src/utils.cpp
+    include/graphics.h
+    include/utils.h
+    include/config.h
+)
 
-# Add include directories
-include_directories(${INCLUDE_DIR})
-include_directories(${THIRD_PARTY}/boost/include)
+# Create executable
+add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Add source files
-add_executable(example_app 
-    ${SRC_DIR}/main.cpp
-    ${SRC_DIR}/utils.cpp
+# Include directories
+target_include_directories(${PROJECT_NAME} PRIVATE
+    include
+    ../third_party/include
+)
+
+# Preprocessor definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    WIN32
+    _DEBUG
+    _CONSOLE
+    USE_OPENGL
+    NDEBUG
 )
 
 # Link libraries
-target_link_directories(example_app PRIVATE ${THIRD_PARTY}/lib)
-
-# Set output directory
-set_target_properties(example_app PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${BUILD_DIR}/bin
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    opengl32
+    glu32
+    user32
+    kernel32
 )
-
-# Configure messages
-message(STATUS "Project root: ${PROJECT_ROOT}")
-message(STATUS "Source directory: ${SRC_DIR}")
-message(STATUS "Include directory: ${INCLUDE_DIR}")
