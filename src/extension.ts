@@ -278,7 +278,8 @@ async function convertVcxprojToCMakeHandler(): Promise<void> {
     try {
         vcxprojContent = fs.readFileSync(vcxprojPath, 'utf8');
     } catch (error) {
-        vscode.window.showErrorMessage(`Failed to read vcxproj file: ${error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to read vcxproj file: ${message}`);
         return;
     }
     
@@ -287,7 +288,8 @@ async function convertVcxprojToCMakeHandler(): Promise<void> {
     try {
         project = parseVcxproj(vcxprojContent, vcxprojPath);
     } catch (error) {
-        vscode.window.showErrorMessage(`Failed to parse vcxproj file: ${error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to parse vcxproj file: ${message}`);
         return;
     }
     
@@ -315,7 +317,8 @@ async function convertVcxprojToCMakeHandler(): Promise<void> {
     try {
         fs.writeFileSync(cmakeListsPath, cmakeContent, 'utf8');
     } catch (error) {
-        vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${message}`);
         return;
     }
     

@@ -23,7 +23,7 @@ export function generateCMakeLists(project: VcxprojProject): string {
 
     // C++ standard (commonly used)
     lines.push('# Set C++ standard');
-    lines.push('set(CMAKE_CXX_STANDARD 11)');
+    lines.push('set(CMAKE_CXX_STANDARD 17)');
     lines.push('set(CMAKE_CXX_STANDARD_REQUIRED ON)');
     lines.push('');
 

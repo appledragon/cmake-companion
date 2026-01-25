@@ -131,7 +131,7 @@ describe('CMake Generator', () => {
 
             const cmake = generateCMakeLists(project);
             
-            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 11)'));
+            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 17)'));
             assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD_REQUIRED ON)'));
         });
 
