@@ -72,6 +72,72 @@ describe('CMake Variable Parser', () => {
             assert.strictEqual(result.length, 1);
             assert.strictEqual(result[0].fullPath, '${JUST_A_VAR}');
         });
+        
+        it('should parse plain relative file paths', () => {
+            const result = parsePaths('src/file.cpp');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, 'src/file.cpp');
+            assert.strictEqual(result[0].variables.length, 0);
+        });
+        
+        it('should parse plain relative paths with dot', () => {
+            const result = parsePaths('./src/file.h');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, './src/file.h');
+            assert.strictEqual(result[0].variables.length, 0);
+        });
+        
+        it('should parse plain relative paths with double dot', () => {
+            const result = parsePaths('../include/header.hpp');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, '../include/header.hpp');
+            assert.strictEqual(result[0].variables.length, 0);
+        });
+        
+        it('should parse plain absolute file paths', () => {
+            const result = parsePaths('/absolute/path/file.txt');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, '/absolute/path/file.txt');
+            assert.strictEqual(result[0].variables.length, 0);
+        });
+        
+        it('should parse paths within quotes', () => {
+            const result = parsePaths('"src/file.cpp"');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, 'src/file.cpp');
+        });
+        
+        it('should parse paths within parentheses', () => {
+            const result = parsePaths('(src/utils.cpp)');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].fullPath, 'src/utils.cpp');
+        });
+        
+        it('should parse multiple plain paths', () => {
+            const result = parsePaths('src/file1.cpp src/file2.h');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].fullPath, 'src/file1.cpp');
+            assert.strictEqual(result[1].fullPath, 'src/file2.h');
+        });
+        
+        it('should parse mixed variable and plain paths', () => {
+            const result = parsePaths('${SRC_DIR}/main.cpp include/header.h');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].fullPath, '${SRC_DIR}/main.cpp');
+            assert.strictEqual(result[0].variables.length, 1);
+            assert.strictEqual(result[1].fullPath, 'include/header.h');
+            assert.strictEqual(result[1].variables.length, 0);
+        });
+        
+        it('should not parse paths without file extensions', () => {
+            const result = parsePaths('src/directory');
+            assert.strictEqual(result.length, 0);
+        });
+        
+        it('should parse paths with various file extensions', () => {
+            const result = parsePaths('file.cpp file.h file.txt file.cmake');
+            assert.strictEqual(result.length, 4);
+        });
     });
     
     describe('containsVariables', () => {

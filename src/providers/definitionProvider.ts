@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parsePaths } from '../parsers';
+import { parsePaths, CMakePathMatch } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
 export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
@@ -47,10 +47,40 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
      */
     private getPathDefinition(
         document: vscode.TextDocument,
-        match: { fullPath: string; startIndex: number; endIndex: number }
+        match: CMakePathMatch
     ): vscode.Definition | null {
         const resolver = getVariableResolver();
-        const resolved = resolver.resolvePath(match.fullPath);
+        const documentDir = path.dirname(document.uri.fsPath);
+        
+        let resolved;
+        
+        // If the path has variables, use the resolver
+        if (match.variables && match.variables.length > 0) {
+            resolved = resolver.resolvePath(match.fullPath);
+        } else {
+            // For plain file paths, resolve relative to the document directory
+            let absolutePath = match.fullPath;
+            if (!path.isAbsolute(match.fullPath)) {
+                absolutePath = path.resolve(documentDir, match.fullPath);
+            }
+            // Normalize the path for cross-platform compatibility
+            absolutePath = path.normalize(absolutePath);
+            
+            // Check if the file exists
+            let exists = false;
+            try {
+                exists = fs.existsSync(absolutePath);
+            } catch {
+                // Ignore errors
+            }
+            
+            resolved = {
+                original: match.fullPath,
+                resolved: absolutePath,
+                exists,
+                unresolvedVariables: []
+            };
+        }
         
         // Only navigate if the path can be fully resolved and exists
         if (resolved.unresolvedVariables.length === 0 && resolved.exists) {
