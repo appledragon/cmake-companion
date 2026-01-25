@@ -186,5 +186,167 @@ describe('CMake Generator', () => {
             assert.ok(cmake.includes('opengl32'));
             assert.ok(cmake.includes('user32'));
         });
+
+        it('should use parsed C++ standard (14)', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                cxxStandard: 14
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 14)'));
+        });
+
+        it('should use parsed C++ standard (20)', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                cxxStandard: 20
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 20)'));
+        });
+
+        it('should include Windows SDK version', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                windowsSdkVersion: '10.0.19041.0'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('set(CMAKE_SYSTEM_VERSION 10.0.19041.0)'));
+        });
+
+        it('should include platform toolset as comment', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                platformToolset: 'v142'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('# Original Visual Studio platform toolset: v142'));
+        });
+
+        it('should add Unicode definitions for Unicode character set', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                characterSet: 'Unicode'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('add_definitions(-DUNICODE -D_UNICODE)'));
+        });
+
+        it('should add MBCS definition for MultiByte character set', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                characterSet: 'MultiByte'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('add_definitions(-D_MBCS)'));
+        });
+
+        it('should set WIN32_EXECUTABLE for Windows subsystem', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                subsystem: 'Windows'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)'));
+        });
+
+        it('should handle Console subsystem with a comment', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                subsystem: 'Console'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('# Console application (default on Windows)'));
+        });
+
+        it('should generate complete CMakeLists with all extended properties', () => {
+            const project: VcxprojProject = {
+                name: 'FullApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: ['header.h'],
+                includeDirectories: ['include'],
+                preprocessorDefinitions: ['DEBUG'],
+                libraries: ['user32'],
+                cxxStandard: 20,
+                windowsSdkVersion: '10.0.22000.0',
+                platformToolset: 'v143',
+                characterSet: 'Unicode',
+                subsystem: 'Windows'
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            // Verify all new properties are present
+            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 20)'));
+            assert.ok(cmake.includes('set(CMAKE_SYSTEM_VERSION 10.0.22000.0)'));
+            assert.ok(cmake.includes('# Original Visual Studio platform toolset: v143'));
+            assert.ok(cmake.includes('add_definitions(-DUNICODE -D_UNICODE)'));
+            assert.ok(cmake.includes('set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)'));
+        });
     });
 });
