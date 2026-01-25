@@ -17,6 +17,7 @@ import {
     legend
 } from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
+import { parseVcxproj, generateCMakeLists } from './parsers';
 
 // Supported language IDs and file patterns
 // Only support CMake files - C/C++ path resolution is handled by other extensions
@@ -136,6 +137,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(openPathCommand);
     
+    // Command to convert vcxproj to CMake
+    const convertVcxprojCommand = vscode.commands.registerCommand(
+        'cmake-path-resolver.convertVcxprojToCMake',
+        convertVcxprojToCMakeHandler
+    );
+    context.subscriptions.push(convertVcxprojCommand);
+    
     // Internal command to refresh decorations (used by file watcher)
     const internalRefreshCommand = vscode.commands.registerCommand(
         'cmake-path-resolver.internal.refreshDecorations',
@@ -234,6 +242,93 @@ function isCMakeFile(document: vscode.TextDocument): boolean {
 export function deactivate(): void {
     disposeFileWatcher();
     console.log('CMake Path Resolver is now deactivated.');
+}
+
+/**
+ * Command handler: Convert vcxproj to CMake
+ * Converts a Visual Studio project file to CMakeLists.txt
+ */
+async function convertVcxprojToCMakeHandler(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    
+    // Check if there's an active editor with a vcxproj file
+    let vcxprojPath: string | undefined;
+    
+    if (editor && editor.document.fileName.endsWith('.vcxproj')) {
+        vcxprojPath = editor.document.fileName;
+    } else {
+        // Show file picker for vcxproj files
+        const fileUri = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            openLabel: 'Select vcxproj file',
+            filters: {
+                'Visual Studio Project': ['vcxproj']
+            }
+        });
+        
+        if (!fileUri || fileUri.length === 0) {
+            return;
+        }
+        
+        vcxprojPath = fileUri[0].fsPath;
+    }
+    
+    // Read the vcxproj file
+    let vcxprojContent: string;
+    try {
+        vcxprojContent = fs.readFileSync(vcxprojPath, 'utf8');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to read vcxproj file: ${error}`);
+        return;
+    }
+    
+    // Parse the vcxproj file
+    let project;
+    try {
+        project = parseVcxproj(vcxprojContent, vcxprojPath);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to parse vcxproj file: ${error}`);
+        return;
+    }
+    
+    // Generate CMakeLists.txt content
+    const cmakeContent = generateCMakeLists(project);
+    
+    // Determine output path (same directory as vcxproj)
+    const vcxprojDir = path.dirname(vcxprojPath);
+    const cmakeListsPath = path.join(vcxprojDir, 'CMakeLists.txt');
+    
+    // Check if CMakeLists.txt already exists
+    if (fs.existsSync(cmakeListsPath)) {
+        const overwrite = await vscode.window.showWarningMessage(
+            `CMakeLists.txt already exists in ${vcxprojDir}. Overwrite?`,
+            'Yes',
+            'No'
+        );
+        
+        if (overwrite !== 'Yes') {
+            return;
+        }
+    }
+    
+    // Write the CMakeLists.txt file
+    try {
+        fs.writeFileSync(cmakeListsPath, cmakeContent, 'utf8');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${error}`);
+        return;
+    }
+    
+    // Show success message and open the file
+    const action = await vscode.window.showInformationMessage(
+        `Successfully converted ${path.basename(vcxprojPath)} to CMakeLists.txt`,
+        'Open CMakeLists.txt'
+    );
+    
+    if (action === 'Open CMakeLists.txt') {
+        const doc = await vscode.workspace.openTextDocument(cmakeListsPath);
+        await vscode.window.showTextDocument(doc);
+    }
 }
 
 /**

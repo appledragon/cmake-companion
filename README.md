@@ -14,6 +14,7 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 - **Built-in Variables**: Support for common CMake variables like `PROJECT_SOURCE_DIR`, `CMAKE_SOURCE_DIR`, etc.
 - **Nested Variables**: Recursive resolution of nested variable references
 - **Custom Variables**: Define custom variable mappings in VS Code settings
+- **vcxproj to CMake Conversion**: Convert Visual Studio project files (.vcxproj) to CMakeLists.txt with one click
 
 ## Supported File Types
 
@@ -32,6 +33,7 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 
 - **Resolve CMake Path**: Manually resolve a CMake path expression
 - **Refresh CMake Variables**: Re-scan the workspace for CMake variable definitions
+- **Convert vcxproj to CMake**: Convert a Visual Studio project file (.vcxproj) to CMakeLists.txt
 
 ### Formatting
 
@@ -39,6 +41,24 @@ To format a CMake document:
 - Right-click and select "Format Document"
 - Use the keyboard shortcut (Shift+Alt+F on Windows/Linux, Shift+Option+F on Mac)
 - Enable "Format on Save" in VS Code settings
+
+### Converting Visual Studio Projects to CMake
+
+To convert a .vcxproj file to CMakeLists.txt:
+1. Open a .vcxproj file or have it active in the editor
+2. Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac)
+3. Run the command "Convert vcxproj to CMake"
+4. The extension will parse the project file and generate a CMakeLists.txt in the same directory
+
+The conversion automatically extracts:
+- Project name and type (executable, static library, or shared library)
+- Source files (.cpp, .c, etc.)
+- Header files (.h, .hpp, etc.)
+- Include directories
+- Preprocessor definitions
+- Library dependencies
+
+**Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
 
 ## Configuration
 
