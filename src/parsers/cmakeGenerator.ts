@@ -13,8 +13,10 @@ import { VcxprojProject } from './vcxprojParser';
 export function generateCMakeLists(project: VcxprojProject): string {
     const lines: string[] = [];
 
-    // CMake minimum version
-    lines.push('cmake_minimum_required(VERSION 3.10)');
+    // CMake minimum version - use 3.16 if PCH is used, otherwise 3.10
+    const usesPch = project.pchConfig && project.pchConfig.enabled && project.pchConfig.headerFile;
+    const cmakeMinVersion = usesPch ? '3.16' : '3.10';
+    lines.push(`cmake_minimum_required(VERSION ${cmakeMinVersion})`);
     lines.push('');
 
     // Project declaration
@@ -128,6 +130,32 @@ export function generateCMakeLists(project: VcxprojProject): string {
         }
         lines.push(')');
         lines.push('');
+    }
+
+    // Precompiled headers (requires CMake 3.16+)
+    if (project.pchConfig && project.pchConfig.enabled && project.pchConfig.headerFile) {
+        lines.push('# Precompiled headers (requires CMake 3.16+)');
+        lines.push(`target_precompile_headers(\${PROJECT_NAME} PRIVATE ${project.pchConfig.headerFile})`);
+        lines.push('');
+
+        // Handle files excluded from PCH
+        if (project.pchConfig.excludedFiles.length > 0) {
+            lines.push('# Files excluded from precompiled headers');
+            lines.push('set_source_files_properties(');
+            for (const file of project.pchConfig.excludedFiles) {
+                lines.push(`    ${file}`);
+            }
+            lines.push('    PROPERTIES SKIP_PRECOMPILE_HEADERS ON');
+            lines.push(')');
+            lines.push('');
+        }
+
+        // If there's a PCH source file that creates the PCH (like stdafx.cpp),
+        // we can optionally add a comment about it
+        if (project.pchConfig.sourceFile) {
+            lines.push(`# Note: Original PCH source file was: ${project.pchConfig.sourceFile}`);
+            lines.push('');
+        }
     }
 
     // Subsystem (Windows-specific linker flag)

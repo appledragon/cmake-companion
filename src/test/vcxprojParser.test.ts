@@ -323,5 +323,105 @@ describe('Vcxproj Parser', () => {
             assert.strictEqual(project.characterSet, 'Unicode');
             assert.strictEqual(project.subsystem, 'Windows');
         });
+
+        it('should parse precompiled header with Create setting', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.ok(project.pchConfig, 'pchConfig should be defined');
+            assert.strictEqual(project.pchConfig.enabled, true);
+            assert.strictEqual(project.pchConfig.headerFile, 'pch.h');
+            assert.strictEqual(project.pchConfig.sourceFile, 'pch.cpp');
+        });
+
+        it('should parse precompiled header with NotUsing exclusions', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="stdafx.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="external/thirdparty.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="generated/code.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.ok(project.pchConfig, 'pchConfig should be defined');
+            assert.strictEqual(project.pchConfig.enabled, true);
+            assert.strictEqual(project.pchConfig.headerFile, 'stdafx.h');
+            assert.strictEqual(project.pchConfig.sourceFile, 'stdafx.cpp');
+            assert.strictEqual(project.pchConfig.excludedFiles.length, 2);
+            assert.ok(project.pchConfig.excludedFiles.includes('external/thirdparty.cpp'));
+            assert.ok(project.pchConfig.excludedFiles.includes('generated/code.cpp'));
+        });
+
+        it('should not have pchConfig when PCH is not used', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="utils.cpp" />
+  </ItemGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            
+            assert.strictEqual(project.pchConfig, undefined);
+        });
+
+        it('should normalize PCH file paths', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>src\\pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\\pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="external\\lib.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, 'C:\\Projects\\MyApp.vcxproj');
+            
+            assert.ok(project.pchConfig, 'pchConfig should be defined');
+            assert.strictEqual(project.pchConfig.headerFile, 'src/pch.h');
+            assert.strictEqual(project.pchConfig.sourceFile, 'src/pch.cpp');
+            assert.ok(project.pchConfig.excludedFiles.includes('external/lib.cpp'));
+        });
     });
 });

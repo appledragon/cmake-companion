@@ -125,7 +125,23 @@
           "property": ["variable.other.property.cmake"]
         }
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "cmake-path-resolver.convertVcxprojToCMake",
+          "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "cmake-path-resolver.convertVcxprojToCMake",
+          "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

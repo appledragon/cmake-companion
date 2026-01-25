@@ -45,10 +45,9 @@ To format a CMake document:
 ### Converting Visual Studio Projects to CMake
 
 To convert a .vcxproj file to CMakeLists.txt:
-1. Open a .vcxproj file or have it active in the editor
-2. Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac)
-3. Run the command "Convert vcxproj to CMake"
-4. The extension will parse the project file and generate a CMakeLists.txt in the same directory
+1. **Right-click on a .vcxproj file** in the Explorer panel and select "Convert vcxproj to CMake"
+2. Or open a .vcxproj file and use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac) to run "Convert vcxproj to CMake"
+3. The extension will parse the project file and generate a CMakeLists.txt in the same directory
 
 The conversion automatically extracts:
 - Project name and type (executable, static library, or shared library)
@@ -62,6 +61,10 @@ The conversion automatically extracts:
 - Platform toolset (informational comment)
 - Character set (UNICODE/_UNICODE or _MBCS definitions)
 - Subsystem (WIN32_EXECUTABLE property for Windows GUI applications)
+- **Precompiled headers (PCH)** - converted to CMake's target_precompile_headers (requires CMake 3.16+)
+  - PCH header file configuration
+  - PCH source file that creates the precompiled header
+  - Per-file exclusions from PCH (files marked as "Not Using Precompiled Headers")
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
 

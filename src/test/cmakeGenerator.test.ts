@@ -348,5 +348,94 @@ describe('CMake Generator', () => {
             assert.ok(cmake.includes('add_definitions(-DUNICODE -D_UNICODE)'));
             assert.ok(cmake.includes('set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)'));
         });
+
+        it('should generate precompiled headers configuration', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp', 'pch.cpp'],
+                headerFiles: ['pch.h'],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                pchConfig: {
+                    enabled: true,
+                    headerFile: 'pch.h',
+                    sourceFile: 'pch.cpp',
+                    excludedFiles: []
+                }
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.16)'), 'Should require CMake 3.16 for PCH');
+            assert.ok(cmake.includes('target_precompile_headers(${PROJECT_NAME} PRIVATE pch.h)'));
+            assert.ok(cmake.includes('# Note: Original PCH source file was: pch.cpp'));
+        });
+
+        it('should generate precompiled headers with excluded files', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp', 'pch.cpp', 'external/lib.cpp'],
+                headerFiles: ['pch.h'],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                pchConfig: {
+                    enabled: true,
+                    headerFile: 'pch.h',
+                    sourceFile: 'pch.cpp',
+                    excludedFiles: ['external/lib.cpp', 'generated/code.cpp']
+                }
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('target_precompile_headers(${PROJECT_NAME} PRIVATE pch.h)'));
+            assert.ok(cmake.includes('# Files excluded from precompiled headers'));
+            assert.ok(cmake.includes('set_source_files_properties('));
+            assert.ok(cmake.includes('external/lib.cpp'));
+            assert.ok(cmake.includes('generated/code.cpp'));
+            assert.ok(cmake.includes('PROPERTIES SKIP_PRECOMPILE_HEADERS ON'));
+        });
+
+        it('should not generate PCH configuration when not enabled', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: []
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.10)'), 'Should use CMake 3.10 without PCH');
+            assert.ok(!cmake.includes('target_precompile_headers'));
+            assert.ok(!cmake.includes('SKIP_PRECOMPILE_HEADERS'));
+        });
+
+        it('should not generate PCH without header file', () => {
+            const project: VcxprojProject = {
+                name: 'MyApp',
+                type: 'Application',
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                includeDirectories: [],
+                preprocessorDefinitions: [],
+                libraries: [],
+                pchConfig: {
+                    enabled: true,
+                    excludedFiles: []
+                }
+            };
+
+            const cmake = generateCMakeLists(project);
+            
+            assert.ok(!cmake.includes('target_precompile_headers'), 'Should not generate PCH without header file');
+        });
     });
 });
