@@ -284,11 +284,13 @@ function findFirstNativeTarget(objects: Record<string, string>): string | undefi
  * @returns Our normalized project type
  */
 function mapProductType(productType: string): 'Application' | 'StaticLibrary' | 'DynamicLibrary' {
-    if (productType.includes('application')) {
+    // Xcode product types use reverse-domain notation
+    // e.g., com.apple.product-type.application, com.apple.product-type.library.static
+    if (productType.includes('application') || productType.includes('tool')) {
         return 'Application';
-    } else if (productType.includes('static-library') || productType.includes('archive.ar')) {
+    } else if (productType.includes('library.static') || productType.includes('archive.ar')) {
         return 'StaticLibrary';
-    } else if (productType.includes('dynamic-library') || productType.includes('dylib')) {
+    } else if (productType.includes('library.dynamic') || productType.includes('dylib')) {
         return 'DynamicLibrary';
     }
     return 'Application';
