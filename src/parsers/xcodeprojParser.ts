@@ -227,10 +227,12 @@ function extractObjectsSection(content: string): Record<string, string> {
     const objectStarts: Array<{id: string; pos: number}> = [];
     
     for (const match of idMatches) {
-        objectStarts.push({
-            id: match[1],
-            pos: match.index!
-        });
+        if (match.index !== undefined) {
+            objectStarts.push({
+                id: match[1],
+                pos: match.index
+            });
+        }
     }
     
     // For each object, extract its content until the matching closing brace

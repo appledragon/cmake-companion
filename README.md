@@ -34,6 +34,7 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 - **Resolve CMake Path**: Manually resolve a CMake path expression
 - **Refresh CMake Variables**: Re-scan the workspace for CMake variable definitions
 - **Convert vcxproj to CMake**: Convert a Visual Studio project file (.vcxproj) to CMakeLists.txt
+- **Convert Xcode project to CMake**: Convert an Xcode project (.xcodeproj) to CMakeLists.txt
 
 ### Formatting
 
@@ -68,6 +69,49 @@ The conversion automatically extracts:
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
 
+### Converting Xcode Projects to CMake
+
+To convert an Xcode project to CMakeLists.txt:
+1. **Right-click on a .xcodeproj directory** in the Explorer panel and select "Convert Xcode project to CMake"
+2. Or use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac) to run "Convert Xcode project to CMake"
+3. The extension will parse the project.pbxproj file and generate a CMakeLists.txt in the parent directory
+
+The conversion automatically extracts:
+- Project name and type (executable, static library, or shared library)
+- Source files (.cpp, .c, .m, .mm, etc.)
+- Header files (.h, .hpp, etc.)
+- Include directories (HEADER_SEARCH_PATHS)
+- Preprocessor definitions (GCC_PREPROCESSOR_DEFINITIONS)
+- Linked frameworks and libraries
+- C++ language standard (CLANG_CXX_LANGUAGE_STANDARD)
+- macOS deployment target (MACOSX_DEPLOYMENT_TARGET)
+- Architecture settings (ARCHS)
+- Compiler flags (OTHER_CPLUSPLUSFLAGS, OTHER_CFLAGS)
+- Linker flags (OTHER_LDFLAGS)
+- Library search paths (LIBRARY_SEARCH_PATHS)
+- Configuration-specific settings (Debug/Release)
+
+**Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations or schemes.
+
+### Pre-processing and Post-processing Scripts
+
+You can configure scripts to run before and after project conversion:
+
+```json
+{
+  "cmake-path-resolver.conversion.preProcessScript": "python preprocess.py",
+  "cmake-path-resolver.conversion.postProcessScript": "python postprocess.py"
+}
+```
+
+The pre-processing script receives the path to the project file (e.g., .vcxproj or .xcodeproj) as an argument, while the post-processing script receives the path to the generated CMakeLists.txt file. These scripts can be used to:
+- Pre-process project files before conversion (e.g., validate, transform, or extract additional information)
+- Post-process generated CMakeLists.txt files (e.g., format, add custom commands, or integrate with build systems)
+
+Example usage:
+- Pre-processing: `./scripts/validate-project.sh "$1"` - validates the project file structure
+- Post-processing: `cmake-format -i "$1"` - formats the generated CMakeLists.txt using cmake-format tool
+
 ## Configuration
 
 ### Custom Variables
@@ -92,6 +136,20 @@ Configure which file types should have CMake path resolution enabled:
   "cmake-path-resolver.enabledFileTypes": ["cmake"]
 }
 ```
+
+### Conversion Options
+
+Configure pre-processing and post-processing scripts for project conversions:
+
+```json
+{
+  "cmake-path-resolver.conversion.preProcessScript": "",
+  "cmake-path-resolver.conversion.postProcessScript": ""
+}
+```
+
+- `preProcessScript`: Shell command to run before converting projects to CMake. The command receives the project file path as an argument.
+- `postProcessScript`: Shell command to run after converting projects to CMake. The command receives the generated CMakeLists.txt path as an argument.
 
 ### Formatting Options
 
