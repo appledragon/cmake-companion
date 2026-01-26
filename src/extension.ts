@@ -6,6 +6,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { 
     CMakeDocumentLinkProvider, 
     CMakeHoverProvider, 
@@ -17,7 +19,9 @@ import {
     legend
 } from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
-import { parseVcxproj, generateCMakeLists } from './parsers';
+import { parseVcxproj, generateCMakeLists, parseXcodeproj, generateCMakeListsFromXcode } from './parsers';
+
+const execAsync = promisify(exec);
 
 // Supported language IDs and file patterns
 // Only support CMake files - C/C++ path resolution is handled by other extensions
@@ -144,6 +148,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(convertVcxprojCommand);
     
+    // Command to convert Xcode project to CMake
+    const convertXcodeprojCommand = vscode.commands.registerCommand(
+        'cmake-path-resolver.convertXcodeprojToCMake',
+        convertXcodeprojToCMakeHandler
+    );
+    context.subscriptions.push(convertXcodeprojCommand);
+    
     // Internal command to refresh decorations (used by file watcher)
     const internalRefreshCommand = vscode.commands.registerCommand(
         'cmake-path-resolver.internal.refreshDecorations',
@@ -245,6 +256,72 @@ export function deactivate(): void {
 }
 
 /**
+ * Run pre-processing script if configured
+ * @param projectPath Path to the project file
+ * @returns True if successful or no script configured, false if script failed
+ */
+async function runPreProcessing(projectPath: string): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+    const preProcessScript = config.get<string>('conversion.preProcessScript', '');
+    
+    if (!preProcessScript || preProcessScript.trim() === '') {
+        return true; // No script configured, consider success
+    }
+    
+    try {
+        const command = `${preProcessScript} "${projectPath}"`;
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Running pre-processing script...',
+                cancellable: false
+            },
+            async () => {
+                await execAsync(command, { cwd: path.dirname(projectPath) });
+            }
+        );
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Pre-processing script failed: ${message}`);
+        return false;
+    }
+}
+
+/**
+ * Run post-processing script if configured
+ * @param cmakeListsPath Path to the generated CMakeLists.txt
+ * @returns True if successful or no script configured, false if script failed
+ */
+async function runPostProcessing(cmakeListsPath: string): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+    const postProcessScript = config.get<string>('conversion.postProcessScript', '');
+    
+    if (!postProcessScript || postProcessScript.trim() === '') {
+        return true; // No script configured, consider success
+    }
+    
+    try {
+        const command = `${postProcessScript} "${cmakeListsPath}"`;
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Running post-processing script...',
+                cancellable: false
+            },
+            async () => {
+                await execAsync(command, { cwd: path.dirname(cmakeListsPath) });
+            }
+        );
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Post-processing script failed: ${message}`);
+        return false;
+    }
+}
+
+/**
  * Command handler: Convert vcxproj to CMake
  * Converts a Visual Studio project file to CMakeLists.txt
  * @param uri Optional URI passed when invoked from explorer context menu
@@ -275,6 +352,11 @@ async function convertVcxprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         }
         
         vcxprojPath = fileUri[0].fsPath;
+    }
+    
+    // Run pre-processing script
+    if (!await runPreProcessing(vcxprojPath)) {
+        return; // Pre-processing failed
     }
     
     // Read the vcxproj file
@@ -326,9 +408,121 @@ async function convertVcxprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         return;
     }
     
+    // Run post-processing script
+    await runPostProcessing(cmakeListsPath);
+    
     // Show success message and open the file
     const action = await vscode.window.showInformationMessage(
         `Successfully converted ${path.basename(vcxprojPath)} to CMakeLists.txt`,
+        'Open CMakeLists.txt'
+    );
+    
+    if (action === 'Open CMakeLists.txt') {
+        const doc = await vscode.workspace.openTextDocument(cmakeListsPath);
+        await vscode.window.showTextDocument(doc);
+    }
+}
+
+/**
+ * Command handler: Convert Xcode project to CMake
+ * Converts an Xcode project file to CMakeLists.txt
+ * @param uri Optional URI passed when invoked from explorer context menu
+ */
+async function convertXcodeprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
+    // Find the xcodeproj directory
+    let xcodeprojPath: string | undefined;
+    
+    // First check if URI was passed from context menu
+    if (uri && uri.fsPath.endsWith('.xcodeproj')) {
+        xcodeprojPath = uri.fsPath;
+    } else {
+        // Show directory picker for xcodeproj directories
+        const fileUri = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            canSelectFolders: true,
+            openLabel: 'Select Xcode project',
+            filters: {}
+        });
+        
+        if (!fileUri || fileUri.length === 0) {
+            return;
+        }
+        
+        xcodeprojPath = fileUri[0].fsPath;
+        if (!xcodeprojPath.endsWith('.xcodeproj')) {
+            vscode.window.showErrorMessage('Please select an .xcodeproj directory');
+            return;
+        }
+    }
+    
+    // The project.pbxproj file is inside the .xcodeproj directory
+    const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
+    
+    if (!fs.existsSync(pbxprojPath)) {
+        vscode.window.showErrorMessage(`project.pbxproj not found in ${xcodeprojPath}`);
+        return;
+    }
+    
+    // Run pre-processing script
+    if (!await runPreProcessing(xcodeprojPath)) {
+        return; // Pre-processing failed
+    }
+    
+    // Read the project.pbxproj file
+    let pbxprojContent: string;
+    try {
+        pbxprojContent = fs.readFileSync(pbxprojPath, 'utf8');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to read project.pbxproj file: ${message}`);
+        return;
+    }
+    
+    // Parse the Xcode project file
+    let project;
+    try {
+        project = parseXcodeproj(pbxprojContent, xcodeprojPath);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to parse Xcode project file: ${message}`);
+        return;
+    }
+    
+    // Generate CMakeLists.txt content
+    const cmakeContent = generateCMakeListsFromXcode(project);
+    
+    // Determine output path (parent directory of .xcodeproj)
+    const projectDir = path.dirname(xcodeprojPath);
+    const cmakeListsPath = path.join(projectDir, 'CMakeLists.txt');
+    
+    // Check if CMakeLists.txt already exists
+    if (fs.existsSync(cmakeListsPath)) {
+        const overwrite = await vscode.window.showWarningMessage(
+            `CMakeLists.txt already exists in ${projectDir}. Overwrite?`,
+            'Yes',
+            'No'
+        );
+        
+        if (overwrite !== 'Yes') {
+            return;
+        }
+    }
+    
+    // Write the CMakeLists.txt file
+    try {
+        fs.writeFileSync(cmakeListsPath, cmakeContent, 'utf8');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${message}`);
+        return;
+    }
+    
+    // Run post-processing script
+    await runPostProcessing(cmakeListsPath);
+    
+    // Show success message and open the file
+    const action = await vscode.window.showInformationMessage(
+        `Successfully converted ${path.basename(xcodeprojPath)} to CMakeLists.txt`,
         'Open CMakeLists.txt'
     );
     

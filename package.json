@@ -40,6 +40,10 @@
       {
         "command": "cmake-path-resolver.convertVcxprojToCMake",
         "title": "Convert vcxproj to CMake"
+      },
+      {
+        "command": "cmake-path-resolver.convertXcodeprojToCMake",
+        "title": "Convert Xcode project to CMake"
       }
     ],
     "configuration": {
@@ -66,6 +70,16 @@
           "type": "boolean",
           "default": false,
           "description": "Enable verbose debug logging in the output channel"
+        },
+        "cmake-path-resolver.conversion.preProcessScript": {
+          "type": "string",
+          "default": "",
+          "description": "Shell command to run before converting projects to CMake. The command receives the project file path as an argument."
+        },
+        "cmake-path-resolver.conversion.postProcessScript": {
+          "type": "string",
+          "default": "",
+          "description": "Shell command to run after converting projects to CMake. The command receives the generated CMakeLists.txt path as an argument."
         },
         "cmake-path-resolver.formatting.style": {
           "type": "string",
@@ -131,6 +145,11 @@
         {
           "command": "cmake-path-resolver.convertVcxprojToCMake",
           "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        },
+        {
+          "command": "cmake-path-resolver.convertXcodeprojToCMake",
+          "when": "resourceExtname == .xcodeproj",
           "group": "navigation"
         }
       ],
