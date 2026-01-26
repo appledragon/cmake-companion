@@ -112,6 +112,8 @@ Example usage:
 - Pre-processing: `./scripts/validate-project.sh "$1"` - validates the project file structure
 - Post-processing: `cmake-format -i "$1"` - formats the generated CMakeLists.txt using cmake-format tool
 
+**Security Note**: Scripts are executed as shell commands in the project directory. Only configure scripts from trusted sources as they have full access to your system with your user permissions.
+
 ## Configuration
 
 ### Custom Variables

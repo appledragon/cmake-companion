@@ -223,7 +223,7 @@ function extractObjectsSection(content: string): Record<string, string> {
     // We need to handle both single-line and multi-line object definitions
     
     // Strategy: Find all object IDs first, then extract their content
-    const idMatches = objectsContent.matchAll(/([A-F0-9]+)\s*\/\*[^*]*\*\/\s*=\s*\{/g);
+    const idMatches = objectsContent.matchAll(/([A-F0-9]+)\s*\/\*.*?\*\/\s*=\s*\{/g);
     const objectStarts: Array<{id: string; pos: number}> = [];
     
     for (const match of idMatches) {
@@ -403,8 +403,8 @@ function extractBuildSettings(config: string): {
 } {
     const settings: ReturnType<typeof extractBuildSettings> = {};
 
-    // Extract build settings section
-    const buildSettingsMatch = config.match(/buildSettings\s*=\s*\{([\s\S]*?)\n\t\t\t\};/);
+    // Extract build settings section with flexible whitespace matching
+    const buildSettingsMatch = config.match(/buildSettings\s*=\s*\{([\s\S]*?)\n\s*\};/);
     if (!buildSettingsMatch) {
         return settings;
     }
