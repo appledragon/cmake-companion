@@ -222,6 +222,47 @@ export function generateCMakeLists(project: VcxprojProject): string {
         }
     }
 
+    // Build events (pre-build, post-build, custom commands)
+    if (project.buildEvents && project.buildEvents.length > 0) {
+        lines.push('# Build events');
+        for (const event of project.buildEvents) {
+            if (event.message) {
+                lines.push(`# ${event.message}`);
+            }
+            
+            if (event.type === 'PreBuild') {
+                lines.push('add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD');
+                lines.push(`    COMMAND ${event.command}`);
+                if (event.message) {
+                    lines.push(`    COMMENT "${event.message}"`);
+                }
+                lines.push(')');
+            } else if (event.type === 'PreLink') {
+                lines.push('add_custom_command(TARGET ${PROJECT_NAME} PRE_LINK');
+                lines.push(`    COMMAND ${event.command}`);
+                if (event.message) {
+                    lines.push(`    COMMENT "${event.message}"`);
+                }
+                lines.push(')');
+            } else if (event.type === 'PostBuild') {
+                lines.push('add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD');
+                lines.push(`    COMMAND ${event.command}`);
+                if (event.message) {
+                    lines.push(`    COMMENT "${event.message}"`);
+                }
+                lines.push(')');
+            } else if (event.type === 'CustomBuild' && event.outputs) {
+                lines.push(`add_custom_command(OUTPUT ${event.outputs.join(' ')}`);
+                lines.push(`    COMMAND ${event.command}`);
+                if (event.message) {
+                    lines.push(`    COMMENT "${event.message}"`);
+                }
+                lines.push(')');
+            }
+            lines.push('');
+        }
+    }
+
     // Subsystem (Windows-specific linker flag)
     if (project.subsystem && project.type === 'Application') {
         lines.push('# Windows subsystem');
@@ -789,6 +830,40 @@ export function generateCMakeListsFromXcode(project: XcodeprojProject): string {
                 lines.push(')');
                 lines.push('');
             }
+        }
+    }
+
+    // Shell script build phases (custom commands)
+    if (project.shellScriptPhases && project.shellScriptPhases.length > 0) {
+        lines.push('# Shell script build phases');
+        for (const script of project.shellScriptPhases) {
+            if (script.name) {
+                lines.push(`# ${script.name}`);
+            }
+            
+            // Determine if this should be PRE_BUILD or POST_BUILD based on outputs
+            // If it has outputs, create a custom command with outputs
+            // Otherwise, create a custom target or POST_BUILD command
+            if (script.outputPaths && script.outputPaths.length > 0) {
+                lines.push(`add_custom_command(OUTPUT ${script.outputPaths.join(' ')}`);
+                lines.push(`    COMMAND ${script.shellPath || '/bin/sh'} -c "${script.shellScript.replace(/"/g, '\\"')}"`);
+                if (script.inputPaths && script.inputPaths.length > 0) {
+                    lines.push(`    DEPENDS ${script.inputPaths.join(' ')}`);
+                }
+                if (script.name) {
+                    lines.push(`    COMMENT "${script.name}"`);
+                }
+                lines.push(')');
+            } else {
+                // No outputs, use POST_BUILD (most common for Run Script phases)
+                lines.push('add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD');
+                lines.push(`    COMMAND ${script.shellPath || '/bin/sh'} -c "${script.shellScript.replace(/"/g, '\\"')}"`);
+                if (script.name) {
+                    lines.push(`    COMMENT "${script.name}"`);
+                }
+                lines.push(')');
+            }
+            lines.push('');
         }
     }
 

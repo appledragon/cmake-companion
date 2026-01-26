@@ -9,8 +9,27 @@
  * - XCBuildConfiguration: Build settings for configurations (Debug/Release)
  * - PBXSourcesBuildPhase: Source files to compile
  * - PBXFrameworksBuildPhase: Libraries to link
+ * - PBXShellScriptBuildPhase: Custom shell scripts
  * - PBXFileReference: References to files in the project
  */
+
+/**
+ * Shell script build phase (Run Script phase in Xcode)
+ */
+export interface ShellScriptPhase {
+    /** Name of the script phase */
+    name?: string;
+    /** Shell script content */
+    shellScript: string;
+    /** Shell path (e.g., /bin/sh) */
+    shellPath?: string;
+    /** Input file paths */
+    inputPaths?: string[];
+    /** Output file paths */
+    outputPaths?: string[];
+    /** Run only for deployment postprocessing */
+    runOnlyForDeploymentPostprocessing?: boolean;
+}
 
 export interface XcodeprojProject {
     name: string;
@@ -33,6 +52,8 @@ export interface XcodeprojProject {
     deploymentTarget?: string;
     /** Architecture (e.g., "arm64", "x86_64", "$(ARCHS_STANDARD)") */
     architecture?: string;
+    /** Shell script build phases (Run Script phases) */
+    shellScriptPhases?: ShellScriptPhase[];
     /** Configuration-specific settings (e.g., Debug/Release) */
     configurations?: Record<string, XcodeprojConfigSettings>;
 }
@@ -127,6 +148,17 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                     } else {
                         project.libraries.push(framework);
                     }
+                }
+            }
+
+            // Check if this is a shell script build phase
+            if (phase.includes('PBXShellScriptBuildPhase')) {
+                if (!project.shellScriptPhases) {
+                    project.shellScriptPhases = [];
+                }
+                const scriptPhase = parseShellScriptPhase(phase);
+                if (scriptPhase) {
+                    project.shellScriptPhases.push(scriptPhase);
                 }
             }
         }
@@ -489,4 +521,70 @@ function mergeUnique(arr1: string[], arr2: string[]): string[] {
         }
     }
     return result;
+}
+
+/**
+ * Parse a shell script build phase
+ * @param phase The shell script build phase object definition
+ * @returns Parsed shell script phase or undefined
+ */
+function parseShellScriptPhase(phase: string): ShellScriptPhase | undefined {
+    // Extract shell script
+    const shellScriptMatch = phase.match(/shellScript\s*=\s*"([^"]*(?:\\.[^"]*)*)"/);
+    if (!shellScriptMatch) {
+        return undefined;
+    }
+
+    const shellScript = shellScriptMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trim();
+
+    if (!shellScript) {
+        return undefined;
+    }
+
+    const scriptPhase: ShellScriptPhase = {
+        shellScript
+    };
+
+    // Extract name (optional)
+    const nameMatch = phase.match(/name\s*=\s*([^;]+);/);
+    if (nameMatch) {
+        scriptPhase.name = unquoteString(nameMatch[1].trim());
+    }
+
+    // Extract shell path
+    const shellPathMatch = phase.match(/shellPath\s*=\s*([^;]+);/);
+    if (shellPathMatch) {
+        scriptPhase.shellPath = unquoteString(shellPathMatch[1].trim());
+    }
+
+    // Extract input paths
+    const inputPathsMatch = phase.match(/inputPaths\s*=\s*\(([\s\S]*?)\);/);
+    if (inputPathsMatch) {
+        const paths = extractListItems(inputPathsMatch[1]);
+        if (paths.length > 0) {
+            scriptPhase.inputPaths = paths;
+        }
+    }
+
+    // Extract output paths
+    const outputPathsMatch = phase.match(/outputPaths\s*=\s*\(([\s\S]*?)\);/);
+    if (outputPathsMatch) {
+        const paths = extractListItems(outputPathsMatch[1]);
+        if (paths.length > 0) {
+            scriptPhase.outputPaths = paths;
+        }
+    }
+
+    // Extract runOnlyForDeploymentPostprocessing
+    const runOnlyMatch = phase.match(/runOnlyForDeploymentPostprocessing\s*=\s*(\d+);/);
+    if (runOnlyMatch) {
+        scriptPhase.runOnlyForDeploymentPostprocessing = runOnlyMatch[1] !== '0';
+    }
+
+    return scriptPhase;
 }

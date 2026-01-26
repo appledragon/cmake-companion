@@ -71,16 +71,6 @@
           "default": false,
           "description": "Enable verbose debug logging in the output channel"
         },
-        "cmake-path-resolver.conversion.preProcessScript": {
-          "type": "string",
-          "default": "",
-          "description": "Shell command to run before converting projects to CMake. The command receives the project file path as an argument."
-        },
-        "cmake-path-resolver.conversion.postProcessScript": {
-          "type": "string",
-          "default": "",
-          "description": "Shell command to run after converting projects to CMake. The command receives the generated CMakeLists.txt path as an argument."
-        },
         "cmake-path-resolver.formatting.style": {
           "type": "string",
           "enum": ["default", "google"],

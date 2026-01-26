@@ -66,6 +66,11 @@ The conversion automatically extracts:
   - PCH header file configuration
   - PCH source file that creates the precompiled header
   - Per-file exclusions from PCH (files marked as "Not Using Precompiled Headers")
+- **Build events** - converted to CMake's add_custom_command
+  - Pre-build events (PRE_BUILD)
+  - Pre-link events (PRE_LINK)
+  - Post-build events (POST_BUILD)
+  - Custom build steps
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
 
@@ -90,29 +95,11 @@ The conversion automatically extracts:
 - Linker flags (OTHER_LDFLAGS)
 - Library search paths (LIBRARY_SEARCH_PATHS)
 - Configuration-specific settings (Debug/Release)
+- **Shell script build phases** - converted to CMake's add_custom_command
+  - Run Script phases with inputs and outputs
+  - Pre-build and post-build scripts
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations or schemes.
-
-### Pre-processing and Post-processing Scripts
-
-You can configure scripts to run before and after project conversion:
-
-```json
-{
-  "cmake-path-resolver.conversion.preProcessScript": "python preprocess.py",
-  "cmake-path-resolver.conversion.postProcessScript": "python postprocess.py"
-}
-```
-
-The pre-processing script receives the path to the project file (e.g., .vcxproj or .xcodeproj) as an argument, while the post-processing script receives the path to the generated CMakeLists.txt file. These scripts can be used to:
-- Pre-process project files before conversion (e.g., validate, transform, or extract additional information)
-- Post-process generated CMakeLists.txt files (e.g., format, add custom commands, or integrate with build systems)
-
-Example usage:
-- Pre-processing: `./scripts/validate-project.sh "$1"` - validates the project file structure
-- Post-processing: `cmake-format -i "$1"` - formats the generated CMakeLists.txt using cmake-format tool
-
-**Security Note**: Scripts are executed as shell commands in the project directory. Only configure scripts from trusted sources as they have full access to your system with your user permissions.
 
 ## Configuration
 
@@ -138,20 +125,6 @@ Configure which file types should have CMake path resolution enabled:
   "cmake-path-resolver.enabledFileTypes": ["cmake"]
 }
 ```
-
-### Conversion Options
-
-Configure pre-processing and post-processing scripts for project conversions:
-
-```json
-{
-  "cmake-path-resolver.conversion.preProcessScript": "",
-  "cmake-path-resolver.conversion.postProcessScript": ""
-}
-```
-
-- `preProcessScript`: Shell command to run before converting projects to CMake. The command receives the project file path as an argument.
-- `postProcessScript`: Shell command to run after converting projects to CMake. The command receives the generated CMakeLists.txt path as an argument.
 
 ### Formatting Options
 

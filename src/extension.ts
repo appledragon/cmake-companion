@@ -6,8 +6,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { 
     CMakeDocumentLinkProvider, 
     CMakeHoverProvider, 
@@ -20,8 +18,6 @@ import {
 } from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
 import { parseVcxproj, generateCMakeLists, parseXcodeproj, generateCMakeListsFromXcode } from './parsers';
-
-const execAsync = promisify(exec);
 
 // Supported language IDs and file patterns
 // Only support CMake files - C/C++ path resolution is handled by other extensions
@@ -256,72 +252,6 @@ export function deactivate(): void {
 }
 
 /**
- * Run pre-processing script if configured
- * @param projectPath Path to the project file
- * @returns True if successful or no script configured, false if script failed
- */
-async function runPreProcessing(projectPath: string): Promise<boolean> {
-    const config = vscode.workspace.getConfiguration('cmake-path-resolver');
-    const preProcessScript = config.get<string>('conversion.preProcessScript', '');
-    
-    if (!preProcessScript || preProcessScript.trim() === '') {
-        return true; // No script configured, consider success
-    }
-    
-    try {
-        const command = `${preProcessScript} "${projectPath}"`;
-        await vscode.window.withProgress(
-            {
-                location: vscode.ProgressLocation.Notification,
-                title: 'Running pre-processing script...',
-                cancellable: false
-            },
-            async () => {
-                await execAsync(command, { cwd: path.dirname(projectPath) });
-            }
-        );
-        return true;
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Pre-processing script failed: ${message}`);
-        return false;
-    }
-}
-
-/**
- * Run post-processing script if configured
- * @param cmakeListsPath Path to the generated CMakeLists.txt
- * @returns True if successful or no script configured, false if script failed
- */
-async function runPostProcessing(cmakeListsPath: string): Promise<boolean> {
-    const config = vscode.workspace.getConfiguration('cmake-path-resolver');
-    const postProcessScript = config.get<string>('conversion.postProcessScript', '');
-    
-    if (!postProcessScript || postProcessScript.trim() === '') {
-        return true; // No script configured, consider success
-    }
-    
-    try {
-        const command = `${postProcessScript} "${cmakeListsPath}"`;
-        await vscode.window.withProgress(
-            {
-                location: vscode.ProgressLocation.Notification,
-                title: 'Running post-processing script...',
-                cancellable: false
-            },
-            async () => {
-                await execAsync(command, { cwd: path.dirname(cmakeListsPath) });
-            }
-        );
-        return true;
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Post-processing script failed: ${message}`);
-        return false;
-    }
-}
-
-/**
  * Command handler: Convert vcxproj to CMake
  * Converts a Visual Studio project file to CMakeLists.txt
  * @param uri Optional URI passed when invoked from explorer context menu
@@ -352,11 +282,6 @@ async function convertVcxprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         }
         
         vcxprojPath = fileUri[0].fsPath;
-    }
-    
-    // Run pre-processing script
-    if (!await runPreProcessing(vcxprojPath)) {
-        return; // Pre-processing failed
     }
     
     // Read the vcxproj file
@@ -407,9 +332,6 @@ async function convertVcxprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${message}`);
         return;
     }
-    
-    // Run post-processing script
-    await runPostProcessing(cmakeListsPath);
     
     // Show success message and open the file
     const action = await vscode.window.showInformationMessage(
@@ -463,11 +385,6 @@ async function convertXcodeprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         return;
     }
     
-    // Run pre-processing script
-    if (!await runPreProcessing(xcodeprojPath)) {
-        return; // Pre-processing failed
-    }
-    
     // Read the project.pbxproj file
     let pbxprojContent: string;
     try {
@@ -516,9 +433,6 @@ async function convertXcodeprojToCMakeHandler(uri?: vscode.Uri): Promise<void> {
         vscode.window.showErrorMessage(`Failed to write CMakeLists.txt: ${message}`);
         return;
     }
-    
-    // Run post-processing script
-    await runPostProcessing(cmakeListsPath);
     
     // Show success message and open the file
     const action = await vscode.window.showInformationMessage(
