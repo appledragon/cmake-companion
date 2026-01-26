@@ -40,6 +40,10 @@
       {
         "command": "cmake-path-resolver.convertVcxprojToCMake",
         "title": "Convert vcxproj to CMake"
+      },
+      {
+        "command": "cmake-path-resolver.convertXcodeprojToCMake",
+        "title": "Convert Xcode project to CMake"
       }
     ],
     "configuration": {
@@ -131,6 +135,11 @@
         {
           "command": "cmake-path-resolver.convertVcxprojToCMake",
           "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        },
+        {
+          "command": "cmake-path-resolver.convertXcodeprojToCMake",
+          "when": "explorerResourceIsFolder && resourceFilename =~ /\\.xcodeproj$/",
           "group": "navigation"
         }
       ],

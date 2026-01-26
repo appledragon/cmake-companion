@@ -34,6 +34,7 @@ A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PAT
 - **Resolve CMake Path**: Manually resolve a CMake path expression
 - **Refresh CMake Variables**: Re-scan the workspace for CMake variable definitions
 - **Convert vcxproj to CMake**: Convert a Visual Studio project file (.vcxproj) to CMakeLists.txt
+- **Convert Xcode project to CMake**: Convert an Xcode project (.xcodeproj) to CMakeLists.txt
 
 ### Formatting
 
@@ -65,8 +66,40 @@ The conversion automatically extracts:
   - PCH header file configuration
   - PCH source file that creates the precompiled header
   - Per-file exclusions from PCH (files marked as "Not Using Precompiled Headers")
+- **Build events** - converted to CMake's add_custom_command
+  - Pre-build events (PRE_BUILD)
+  - Pre-link events (PRE_LINK)
+  - Post-build events (POST_BUILD)
+  - Custom build steps
 
 **Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations.
+
+### Converting Xcode Projects to CMake
+
+To convert an Xcode project to CMakeLists.txt:
+1. **Right-click on a .xcodeproj directory** in the Explorer panel and select "Convert Xcode project to CMake"
+2. Or use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P on Mac) to run "Convert Xcode project to CMake"
+3. The extension will parse the project.pbxproj file and generate a CMakeLists.txt in the parent directory
+
+The conversion automatically extracts:
+- Project name and type (executable, static library, or shared library)
+- Source files (.cpp, .c, .m, .mm, etc.)
+- Header files (.h, .hpp, etc.)
+- Include directories (HEADER_SEARCH_PATHS)
+- Preprocessor definitions (GCC_PREPROCESSOR_DEFINITIONS)
+- Linked frameworks and libraries
+- C++ language standard (CLANG_CXX_LANGUAGE_STANDARD)
+- macOS deployment target (MACOSX_DEPLOYMENT_TARGET)
+- Architecture settings (ARCHS)
+- Compiler flags (OTHER_CPLUSPLUSFLAGS, OTHER_CFLAGS)
+- Linker flags (OTHER_LDFLAGS)
+- Library search paths (LIBRARY_SEARCH_PATHS)
+- Configuration-specific settings (Debug/Release)
+- **Shell script build phases** - converted to CMake's add_custom_command
+  - Run Script phases with inputs and outputs
+  - Pre-build and post-build scripts
+
+**Note**: The generated CMakeLists.txt is a starting point and may require manual adjustments for complex projects with custom build configurations or schemes.
 
 ## Configuration
 

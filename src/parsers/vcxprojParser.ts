@@ -17,6 +17,20 @@ export interface PchConfig {
     excludedFiles: string[];
 }
 
+/**
+ * Build event configuration (PreBuildEvent, PostBuildEvent, CustomBuildStep)
+ */
+export interface BuildEvent {
+    /** Type of build event */
+    type: 'PreBuild' | 'PostBuild' | 'PreLink' | 'CustomBuild';
+    /** Command to execute */
+    command: string;
+    /** Description message */
+    message?: string;
+    /** Output files (for CustomBuildStep) */
+    outputs?: string[];
+}
+
 export interface VcxprojProject {
     name: string;
     type: 'Application' | 'StaticLibrary' | 'DynamicLibrary';
@@ -60,6 +74,8 @@ export interface VcxprojProject {
     multiProcessorCompilation?: boolean;
     /** Precompiled header configuration */
     pchConfig?: PchConfig;
+    /** Build events (pre-build, post-build, custom build steps) */
+    buildEvents?: BuildEvent[];
     /** Configuration-specific settings (e.g., Debug/Release) */
     configurations?: Record<string, VcxprojConfigSettings>;
 }
@@ -263,6 +279,9 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
 
     // Parse precompiled header configuration
     project.pchConfig = parsePchConfig(content);
+
+    // Parse build events (pre-build, post-build, custom build)
+    project.buildEvents = parseBuildEvents(content);
 
     // Parse configuration-specific settings
     const configSettings = parseConfigurationSettings(content);
@@ -662,4 +681,85 @@ function parsePchConfig(content: string): PchConfig | undefined {
     }
 
     return undefined;
+}
+
+/**
+ * Parse build events from vcxproj content
+ * @param content The XML content of the vcxproj file
+ * @returns Array of build events or undefined if none found
+ */
+function parseBuildEvents(content: string): BuildEvent[] | undefined {
+    const buildEvents: BuildEvent[] = [];
+
+    // Extract PreBuildEvent
+    const preBuildMatch = content.match(/<PreBuildEvent>([\s\S]*?)<\/PreBuildEvent>/);
+    if (preBuildMatch) {
+        const preBuildContent = preBuildMatch[1];
+        const commandMatch = preBuildContent.match(/<Command>(.*?)<\/Command>/);
+        const messageMatch = preBuildContent.match(/<Message>(.*?)<\/Message>/);
+        
+        if (commandMatch && commandMatch[1].trim()) {
+            buildEvents.push({
+                type: 'PreBuild',
+                command: commandMatch[1].trim(),
+                message: messageMatch ? messageMatch[1].trim() : undefined
+            });
+        }
+    }
+
+    // Extract PreLinkEvent
+    const preLinkMatch = content.match(/<PreLinkEvent>([\s\S]*?)<\/PreLinkEvent>/);
+    if (preLinkMatch) {
+        const preLinkContent = preLinkMatch[1];
+        const commandMatch = preLinkContent.match(/<Command>(.*?)<\/Command>/);
+        const messageMatch = preLinkContent.match(/<Message>(.*?)<\/Message>/);
+        
+        if (commandMatch && commandMatch[1].trim()) {
+            buildEvents.push({
+                type: 'PreLink',
+                command: commandMatch[1].trim(),
+                message: messageMatch ? messageMatch[1].trim() : undefined
+            });
+        }
+    }
+
+    // Extract PostBuildEvent
+    const postBuildMatch = content.match(/<PostBuildEvent>([\s\S]*?)<\/PostBuildEvent>/);
+    if (postBuildMatch) {
+        const postBuildContent = postBuildMatch[1];
+        const commandMatch = postBuildContent.match(/<Command>(.*?)<\/Command>/);
+        const messageMatch = postBuildContent.match(/<Message>(.*?)<\/Message>/);
+        
+        if (commandMatch && commandMatch[1].trim()) {
+            buildEvents.push({
+                type: 'PostBuild',
+                command: commandMatch[1].trim(),
+                message: messageMatch ? messageMatch[1].trim() : undefined
+            });
+        }
+    }
+
+    // Extract CustomBuildStep
+    const customBuildMatch = content.match(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/);
+    if (customBuildMatch) {
+        const customBuildContent = customBuildMatch[1];
+        const commandMatch = customBuildContent.match(/<Command>(.*?)<\/Command>/);
+        const messageMatch = customBuildContent.match(/<Message>(.*?)<\/Message>/);
+        const outputsMatch = customBuildContent.match(/<Outputs>(.*?)<\/Outputs>/);
+        
+        if (commandMatch && commandMatch[1].trim()) {
+            const outputs = outputsMatch 
+                ? outputsMatch[1].split(';').map(o => o.trim()).filter(o => o)
+                : undefined;
+                
+            buildEvents.push({
+                type: 'CustomBuild',
+                command: commandMatch[1].trim(),
+                message: messageMatch ? messageMatch[1].trim() : undefined,
+                outputs: outputs
+            });
+        }
+    }
+
+    return buildEvents.length > 0 ? buildEvents : undefined;
 }
