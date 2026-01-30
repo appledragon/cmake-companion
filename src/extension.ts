@@ -14,6 +14,10 @@ import {
     CMakeDocumentFormattingProvider,
     CMakeDocumentRangeFormattingProvider,
     CMakeOnTypeFormattingProvider,
+    CMakeCompletionProvider,
+    CMakeFoldingRangeProvider,
+    getDiagnosticProvider,
+    disposeDiagnosticProvider,
     legend
 } from './providers';
 import { getVariableResolver, getFileWatcher, disposeFileWatcher } from './services';
@@ -116,6 +120,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         );
         context.subscriptions.push(onTypeFormattingProvider);
     }
+    
+    // Register completion provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const completionProvider = vscode.languages.registerCompletionItemProvider(
+            selector,
+            new CMakeCompletionProvider(),
+            '$', '{' // Trigger characters for variable completion
+        );
+        context.subscriptions.push(completionProvider);
+    }
+    
+    // Register folding range provider for all supported languages/patterns
+    for (const selector of SUPPORTED_LANGUAGES) {
+        const foldingProvider = vscode.languages.registerFoldingRangeProvider(
+            selector,
+            new CMakeFoldingRangeProvider()
+        );
+        context.subscriptions.push(foldingProvider);
+    }
+    
+    // Initialize diagnostic provider (singleton with its own lifecycle management)
+    const diagnosticProvider = getDiagnosticProvider();
+    context.subscriptions.push({ dispose: () => disposeDiagnosticProvider() });
     
     // Register commands
     const resolvePathCommand = vscode.commands.registerCommand(
@@ -241,6 +268,7 @@ function isCMakeFile(document: vscode.TextDocument): boolean {
  */
 export function deactivate(): void {
     disposeFileWatcher();
+    disposeDiagnosticProvider();
     console.log('CMake Path Resolver is now deactivated.');
 }
 

@@ -1,18 +1,20 @@
 /**
  * Definition Provider
- * Enables Ctrl+Click navigation to resolved paths (files and directories)
+ * Enables Ctrl+Click navigation to:
+ * - Resolved paths (files and directories)
+ * - Variable definitions (${VAR} -> set(VAR ...))
  */
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parsePaths, CMakePathMatch } from '../parsers';
+import { parsePaths, parseVariables, CMakePathMatch } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 
 export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
     
     /**
-     * Provide definition locations for CMake paths
+     * Provide definition locations for CMake paths and variables
      * @param document The document
      * @param position The position
      * @param token Cancellation token
@@ -26,7 +28,13 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
         const text = document.getText();
         const offset = document.offsetAt(position);
         
-        // Find if we're on a CMake path
+        // First, check if we're on a variable reference ${VAR}
+        const variableDefinition = this.getVariableDefinition(document, text, offset, token);
+        if (variableDefinition) {
+            return variableDefinition;
+        }
+        
+        // Then check if we're on a CMake path
         const pathMatches = parsePaths(text);
         
         for (const match of pathMatches) {
@@ -36,6 +44,78 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
             
             if (offset >= match.startIndex && offset <= match.endIndex) {
                 return this.getPathDefinition(document, match);
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get definition location for a CMake variable
+     * Navigates from ${VAR} to the set(VAR ...) command
+     */
+    private getVariableDefinition(
+        document: vscode.TextDocument,
+        text: string,
+        offset: number,
+        token: vscode.CancellationToken
+    ): vscode.Definition | null {
+        const resolver = getVariableResolver();
+        const variables = parseVariables(text);
+        
+        for (const variable of variables) {
+            if (token.isCancellationRequested) {
+                return null;
+            }
+            
+            if (offset >= variable.startIndex && offset <= variable.endIndex) {
+                const definition = resolver.getDefinition(variable.variableName);
+                
+                if (definition && definition.file && definition.line) {
+                    // Return location to the variable definition
+                    return new vscode.Location(
+                        vscode.Uri.file(definition.file),
+                        new vscode.Position(definition.line - 1, 0) // line is 1-based
+                    );
+                }
+                
+                // If no external definition found, try to find local definition in current file
+                const localDefinition = this.findLocalVariableDefinition(
+                    document, 
+                    variable.variableName
+                );
+                if (localDefinition) {
+                    return localDefinition;
+                }
+                
+                // Variable not found anywhere
+                return null;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Find a variable definition within the current document
+     */
+    private findLocalVariableDefinition(
+        document: vscode.TextDocument,
+        variableName: string
+    ): vscode.Location | null {
+        const text = document.getText();
+        
+        // Match: set(VAR_NAME or option(VAR_NAME
+        const patterns = [
+            new RegExp(`^\\s*set\\s*\\(\\s*(${variableName})\\b`, 'gim'),
+            new RegExp(`^\\s*option\\s*\\(\\s*(${variableName})\\b`, 'gim'),
+        ];
+        
+        for (const pattern of patterns) {
+            let match;
+            while ((match = pattern.exec(text)) !== null) {
+                const position = document.positionAt(match.index);
+                return new vscode.Location(document.uri, position);
             }
         }
         

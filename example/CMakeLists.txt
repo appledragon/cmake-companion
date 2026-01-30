@@ -34,6 +34,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     NDEBUG
 )
 
+if(condition)
+    
+endif()
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
     opengl32

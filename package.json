@@ -88,6 +88,31 @@
         "cmake-path-resolver.formatting.uppercaseCommands": {
           "type": "boolean",
           "description": "Convert CMake command names to uppercase. Overrides the style preset value when set."
+        },
+        "cmake-path-resolver.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CMake diagnostics and linting"
+        },
+        "cmake-path-resolver.diagnostics.undefinedVariables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn on undefined variables"
+        },
+        "cmake-path-resolver.diagnostics.unmatchedBlocks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Error on unmatched block pairs (if/endif, function/endfunction, etc.)"
+        },
+        "cmake-path-resolver.diagnostics.deprecatedCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hint on deprecated CMake commands"
+        },
+        "cmake-path-resolver.diagnostics.nonExistentPaths": {
+          "type": "boolean",
+          "default": false,
+          "description": "Warn on non-existent file paths (may be slow for large files)"
         }
       }
     },
