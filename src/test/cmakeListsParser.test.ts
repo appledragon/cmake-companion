@@ -78,6 +78,36 @@ set(ACTUAL "value")`;
             assert.strictEqual(result.length, 1);
             assert.strictEqual(result[0].value, '${CMAKE_SOURCE_DIR}/include');
         });
+
+        it('should parse multi-line set command with list of files', () => {
+            const content = `set(SOURCES
+    src/main.cpp
+    src/graphics.cpp
+    src/utils.cpp
+    include/graphics.h
+)`;
+            const result = parseSetCommands(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'SOURCES');
+            // Values should be joined with semicolons (CMake list separator)
+            assert.strictEqual(result[0].value, 'src/main.cpp;src/graphics.cpp;src/utils.cpp;include/graphics.h');
+            assert.strictEqual(result[0].line, 1);
+        });
+
+        it('should parse multi-line set command with comments in list', () => {
+            const content = `set(SOURCES
+    src/main.cpp
+    # This is a comment
+    src/utils.cpp
+)`;
+            const result = parseSetCommands(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'SOURCES');
+            // Comments should be filtered out
+            assert.strictEqual(result[0].value, 'src/main.cpp;src/utils.cpp');
+        });
     });
     
     describe('parseProjectName', () => {
@@ -115,6 +145,36 @@ include("cmake/config.cmake")
             assert.strictEqual(result[0], 'cmake/utils.cmake');
             assert.strictEqual(result[1], 'cmake/config.cmake');
         });
+
+        it('should parse multi-line include command', () => {
+            const content = `include(
+    cmake/utils.cmake
+)`;
+            const result = parseIncludes(content);
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0], 'cmake/utils.cmake');
+        });
+
+        it('should skip commented include commands', () => {
+            const content = `# include(cmake/commented.cmake)
+include(cmake/actual.cmake)`;
+            const result = parseIncludes(content);
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0], 'cmake/actual.cmake');
+        });
+
+        it('should parse multi-line include with comments', () => {
+            const content = `include(
+    # This is a comment
+    cmake/utils.cmake
+)`;
+            const result = parseIncludes(content);
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0], 'cmake/utils.cmake');
+        });
     });
     
     describe('parseOptions', () => {
@@ -133,6 +193,56 @@ option(USE_SSL "Use SSL")
             assert.strictEqual(result[1].value, 'OFF');
             assert.strictEqual(result[2].name, 'USE_SSL');
             assert.strictEqual(result[2].value, 'OFF'); // Default
+        });
+
+        it('should parse multi-line option command', () => {
+            const content = `option(ENABLE_TESTS
+    "Enable unit tests"
+    ON
+)`;
+            const result = parseOptions(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'ENABLE_TESTS');
+            assert.strictEqual(result[0].value, 'ON');
+        });
+
+        it('should skip commented option commands', () => {
+            const content = `# option(COMMENTED "Commented option" ON)
+option(ACTUAL "Actual option" OFF)`;
+            const result = parseOptions(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'ACTUAL');
+            assert.strictEqual(result[0].value, 'OFF');
+        });
+
+        it('should parse multi-line option with comments', () => {
+            const content = `option(MY_OPTION
+    # This is a comment
+    "Description"
+    ON
+)`;
+            const result = parseOptions(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'MY_OPTION');
+            assert.strictEqual(result[0].value, 'ON');
+        });
+
+        it('should track correct line numbers for multi-line options', () => {
+            const content = `# Line 1
+# Line 2
+option(FIRST_OPTION
+    "First option"
+    ON
+)
+option(SECOND_OPTION "Second option" OFF)`;
+            const result = parseOptions(content, '/path/CMakeLists.txt');
+            
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].line, 3);
+            assert.strictEqual(result[1].line, 7);
         });
     });
 });

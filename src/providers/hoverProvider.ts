@@ -100,7 +100,10 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         
         markdown.appendMarkdown('**CMake Path**\n\n');
         markdown.appendMarkdown(`**Original:** \`${match.fullPath}\`\n\n`);
-        markdown.appendMarkdown(`**Resolved:** \`${resolved.resolved}\`\n\n`);
+        
+        // Format resolved value - if it contains semicolons (CMake list), display as list
+        const resolvedDisplay = this.formatValueForDisplay(resolved.resolved);
+        markdown.appendMarkdown(`**Resolved:** ${resolvedDisplay}\n\n`);
         
         if (resolved.unresolvedVariables.length > 0) {
             markdown.appendMarkdown(`⚠️ **Unresolved variables:** ${resolved.unresolvedVariables.map(v => `\`${v}\``).join(', ')}\n\n`);
@@ -138,7 +141,9 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         markdown.appendMarkdown(`**Name:** \`${variable.variableName}\`\n\n`);
         
         if (value !== undefined) {
-            markdown.appendMarkdown(`**Value:** \`${value}\`\n\n`);
+            // Format value - if it contains semicolons (CMake list), display as list
+            const valueDisplay = this.formatValueForDisplay(value);
+            markdown.appendMarkdown(`**Value:** ${valueDisplay}\n\n`);
             
             if (definition) {
                 const fileUri = vscode.Uri.file(definition.file);
@@ -159,5 +164,19 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         const range = new vscode.Range(startPos, endPos);
         
         return new vscode.Hover(markdown, range);
+    }
+
+    /**
+     * Format a value for display in hover
+     * If the value contains semicolons (CMake list), display as a formatted list
+     */
+    private formatValueForDisplay(value: string): string {
+        // Check if this is a CMake list (contains semicolons)
+        if (value.includes(';')) {
+            const items = value.split(';');
+            // Display as a formatted list with line breaks
+            return '\n' + items.map(item => `- \`${item}\``).join('\n');
+        }
+        return `\`${value}\``;
     }
 }
