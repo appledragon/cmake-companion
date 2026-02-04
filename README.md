@@ -1,4 +1,4 @@
-# CMake Path Resolver
+# CMake Companion
 
 A VS Code extension for resolving CMake variable paths (like `${MY_WORKSPACE_PATH}/path/file.h`) with underline decoration, hover tips, and click-to-navigate functionality.
 
@@ -109,7 +109,7 @@ You can define custom variable mappings in your VS Code settings:
 
 ```json
 {
-  "cmake-path-resolver.customVariables": {
+  "cmake-companion.customVariables": {
     "MY_WORKSPACE_PATH": "/path/to/workspace",
     "THIRD_PARTY_DIR": "/path/to/third_party"
   }
@@ -122,7 +122,7 @@ Configure which file types should have CMake path resolution enabled:
 
 ```json
 {
-  "cmake-path-resolver.enabledFileTypes": ["cmake"]
+  "cmake-companion.enabledFileTypes": ["cmake"]
 }
 ```
 
@@ -132,11 +132,11 @@ Configure document formatting behavior:
 
 ```json
 {
-  "cmake-path-resolver.formatting.style": "google",
-  "cmake-path-resolver.formatting.maxLineLength": 0,
-  "cmake-path-resolver.formatting.spaceAfterOpenParen": false,
-  "cmake-path-resolver.formatting.spaceBeforeCloseParen": false,
-  "cmake-path-resolver.formatting.uppercaseCommands": false
+  "cmake-companion.formatting.style": "google",
+  "cmake-companion.formatting.maxLineLength": 0,
+  "cmake-companion.formatting.spaceAfterOpenParen": false,
+  "cmake-companion.formatting.spaceBeforeCloseParen": false,
+  "cmake-companion.formatting.uppercaseCommands": false
 }
 ```
 
@@ -152,7 +152,7 @@ To use Google-style formatting (similar to clang-format's Google style for CMake
 
 ```json
 {
-  "cmake-path-resolver.formatting.style": "google"
+  "cmake-companion.formatting.style": "google"
 }
 ```
 
@@ -191,7 +191,7 @@ The extension provides syntax highlighting for:
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "CMake Path Resolver"
+3. Search for "CMake Companion"
 4. Click Install
 
 ## Development

@@ -9,7 +9,7 @@
 // Example: ${SRC_DIR}/main.cpp
 
 int main() {
-    std::cout << "=== CMake Path Resolver Test ===" << std::endl;
+    std::cout << "=== CMake Companion Test ===" << std::endl;
     
     // Test utility function
     utils::printMessage("Hello from example project!");

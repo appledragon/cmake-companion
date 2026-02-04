@@ -1,7 +1,7 @@
 {
-  "name": "cmake-path-helper",
-  "displayName": "CMake Path Helper",
-  "description": "Resolve CMake variable paths (${VAR}/path/file.h) with underline decoration, hover tips, and click-to-navigate functionality",
+  "name": "cmake-companion",
+  "displayName": "CMake Companion",
+  "description": "Your intelligent CMake development companion - featuring path navigation, smart completions, formatting, diagnostics, and project conversion tools",
   "version": "0.0.1",
   "publisher": "appledragon",
   "icon": "icon.png",
@@ -30,90 +30,90 @@
   "contributes": {
     "commands": [
       {
-        "command": "cmake-path-resolver.resolvePath",
+        "command": "cmake-companion.resolvePath",
         "title": "Resolve CMake Path"
       },
       {
-        "command": "cmake-path-resolver.refreshVariables",
+        "command": "cmake-companion.refreshVariables",
         "title": "Refresh CMake Variables"
       },
       {
-        "command": "cmake-path-resolver.convertVcxprojToCMake",
+        "command": "cmake-companion.convertVcxprojToCMake",
         "title": "Convert vcxproj to CMake"
       },
       {
-        "command": "cmake-path-resolver.convertXcodeprojToCMake",
+        "command": "cmake-companion.convertXcodeprojToCMake",
         "title": "Convert Xcode project to CMake"
       }
     ],
     "configuration": {
-      "title": "CMake Path Resolver",
+      "title": "CMake Companion",
       "properties": {
-        "cmake-path-resolver.customVariables": {
+        "cmake-companion.customVariables": {
           "type": "object",
           "default": {},
           "description": "Custom variable mappings (e.g., {\"MY_WORKSPACE_PATH\": \"/path/to/workspace\"})"
         },
-        "cmake-path-resolver.enabledFileTypes": {
+        "cmake-companion.enabledFileTypes": {
           "type": "array",
           "default": [
             "cmake"
           ],
           "description": "File types where CMake path resolution is enabled"
         },
-        "cmake-path-resolver.environmentVariables": {
+        "cmake-companion.environmentVariables": {
           "type": "object",
           "default": {},
           "description": "Environment variable overrides used for $ENV{VAR} resolution"
         },
-        "cmake-path-resolver.debugLogging": {
+        "cmake-companion.debugLogging": {
           "type": "boolean",
           "default": false,
           "description": "Enable verbose debug logging in the output channel"
         },
-        "cmake-path-resolver.formatting.style": {
+        "cmake-companion.formatting.style": {
           "type": "string",
           "enum": ["default", "google"],
           "default": "google",
           "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
         },
-        "cmake-path-resolver.formatting.maxLineLength": {
+        "cmake-companion.formatting.maxLineLength": {
           "type": "number",
           "description": "Maximum line length for formatting (0 = no limit). Overrides the style preset value when set."
         },
-        "cmake-path-resolver.formatting.spaceAfterOpenParen": {
+        "cmake-companion.formatting.spaceAfterOpenParen": {
           "type": "boolean",
           "description": "Add space after opening parenthesis in commands. Overrides the style preset value when set."
         },
-        "cmake-path-resolver.formatting.spaceBeforeCloseParen": {
+        "cmake-companion.formatting.spaceBeforeCloseParen": {
           "type": "boolean",
           "description": "Add space before closing parenthesis in commands. Overrides the style preset value when set."
         },
-        "cmake-path-resolver.formatting.uppercaseCommands": {
+        "cmake-companion.formatting.uppercaseCommands": {
           "type": "boolean",
           "description": "Convert CMake command names to uppercase. Overrides the style preset value when set."
         },
-        "cmake-path-resolver.diagnostics.enabled": {
+        "cmake-companion.diagnostics.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable CMake diagnostics and linting"
         },
-        "cmake-path-resolver.diagnostics.undefinedVariables": {
+        "cmake-companion.diagnostics.undefinedVariables": {
           "type": "boolean",
           "default": true,
           "description": "Warn on undefined variables"
         },
-        "cmake-path-resolver.diagnostics.unmatchedBlocks": {
+        "cmake-companion.diagnostics.unmatchedBlocks": {
           "type": "boolean",
           "default": true,
           "description": "Error on unmatched block pairs (if/endif, function/endfunction, etc.)"
         },
-        "cmake-path-resolver.diagnostics.deprecatedCommands": {
+        "cmake-companion.diagnostics.deprecatedCommands": {
           "type": "boolean",
           "default": true,
           "description": "Hint on deprecated CMake commands"
         },
-        "cmake-path-resolver.diagnostics.nonExistentPaths": {
+        "cmake-companion.diagnostics.nonExistentPaths": {
           "type": "boolean",
           "default": false,
           "description": "Warn on non-existent file paths (may be slow for large files)"
@@ -158,19 +158,19 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "cmake-path-resolver.convertVcxprojToCMake",
+          "command": "cmake-companion.convertVcxprojToCMake",
           "when": "resourceExtname == .vcxproj",
           "group": "navigation"
         },
         {
-          "command": "cmake-path-resolver.convertXcodeprojToCMake",
+          "command": "cmake-companion.convertXcodeprojToCMake",
           "when": "explorerResourceIsFolder && resourceFilename =~ /\\.xcodeproj$/",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
-          "command": "cmake-path-resolver.convertVcxprojToCMake",
+          "command": "cmake-companion.convertVcxprojToCMake",
           "when": "resourceExtname == .vcxproj",
           "group": "navigation"
         }
@@ -201,6 +201,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/appledragon/cmake-path-resolver"
+    "url": "https://github.com/appledragon/cmake-companion"
   }
 }

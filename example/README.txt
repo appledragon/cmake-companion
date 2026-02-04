@@ -1,7 +1,7 @@
-README for CMake Path Resolver Plugin Example
+README for CMake Companion Plugin Example
 ==============================================
 
-This example project demonstrates the features of the CMake Path Helper 
+This example project demonstrates the features of the CMake Companion 
 VS Code extension. The extension provides intelligent path resolution, 
 navigation, hover tips, and syntax highlighting for CMake files.
 
@@ -229,7 +229,7 @@ EXTENSION FEATURES TO TEST
 HOW TO USE THIS EXAMPLE
 =============================================================================
 
-1. Open VS Code in the cmake-path-resolver directory
+1. Open VS Code in the cmake-companion directory
 2. Install the CMake Path Helper extension
 3. Open any .cmake file in the example/ folder
 4. Try the following:
@@ -298,8 +298,8 @@ TROUBLESHOOTING
 Extension not working?
 - Check that .cmake files are associated with "cmake" language mode
 - Try "Refresh CMake Variables" command from Command Palette
-- Check Output panel → CMake Path Resolver for debug messages
-- Enable debug logging in settings: cmake-path-resolver.debugLogging
+- Check Output panel → CMake Companion for debug messages
+- Enable debug logging in settings: cmake-companion.debugLogging
 
 Paths not resolving?
 - Make sure CMakeLists.txt has been opened (variables need to be parsed)
@@ -318,21 +318,21 @@ CUSTOMIZATION
 
 You can customize the extension behavior in VS Code settings:
 
-cmake-path-resolver.customVariables
+cmake-companion.customVariables
   - Define custom variable mappings
   - Example: { "MY_VAR": "/custom/path" }
 
-cmake-path-resolver.debugLogging
+cmake-companion.debugLogging
   - Enable debug output for troubleshooting
-  - Check Output → CMake Path Resolver
+  - Check Output → CMake Companion
 
-cmake-path-resolver.formatting.indentSize
+cmake-companion.formatting.indentSize
   - Number of spaces for indentation (default: 4)
 
-cmake-path-resolver.formatting.commandCase
+cmake-companion.formatting.commandCase
   - "lowercase" or "uppercase" (default: "lowercase")
 
-cmake-path-resolver.formatting.parenthesesSpacing
+cmake-companion.formatting.parenthesesSpacing
   - Add space after ( and before ) (default: false)
 
 =============================================================================

@@ -10,7 +10,7 @@ import { CoreVariableResolver } from './coreVariableResolver';
 // Re-export ResolvedPath for convenience
 export { ResolvedPath } from './coreVariableResolver';
 
-const outputChannel = vscode.window.createOutputChannel('CMake Path Resolver');
+const outputChannel = vscode.window.createOutputChannel('CMake Companion');
 
 function logDebug(enabled: boolean, message: string): void {
     if (!enabled) {
@@ -44,7 +44,7 @@ export class VariableResolver extends CoreVariableResolver {
      * Load custom variables from VS Code settings
      */
     private loadVSCodeCustomVariables(): void {
-        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const config = vscode.workspace.getConfiguration('cmake-companion');
         const customVariables = config.get<Record<string, string>>('customVariables', {});
         this.debugEnabled = config.get<boolean>('debugLogging', false);
         super.loadCustomVariables(customVariables);
@@ -55,7 +55,7 @@ export class VariableResolver extends CoreVariableResolver {
      * Load environment variables from VS Code settings (overrides process.env)
      */
     private loadVSCodeEnvironmentVariables(): void {
-        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const config = vscode.workspace.getConfiguration('cmake-companion');
         const envOverrides = config.get<Record<string, string>>('environmentVariables', {});
         super.loadEnvVariables(envOverrides);
         logDebug(this.debugEnabled, `Loaded environment overrides: ${Object.keys(envOverrides).length}`);

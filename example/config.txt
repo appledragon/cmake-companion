@@ -1,4 +1,4 @@
-# Configuration file for CMake Path Resolver example
+# Configuration file for CMake Companion example
 # This file demonstrates various CMake variable path patterns
 
 [project]

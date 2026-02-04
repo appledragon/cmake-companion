@@ -276,7 +276,7 @@ function isCMakeFile(document: vscode.TextDocument): boolean {
 export function deactivate(): void {
     disposeFileWatcher();
     disposeDiagnosticProvider();
-    console.log('CMake Path Resolver is now deactivated.');
+    console.log('CMake Companion is now deactivated.');
 }
 
 /**
@@ -550,7 +550,7 @@ async function refreshVariablesCommandHandler(): Promise<void> {
     
     const variableCount = resolver.getVariableNames().length;
     vscode.window.showInformationMessage(
-        `CMake Path Resolver: ${variableCount} variables loaded from open files`
+        `CMake Companion: ${variableCount} variables loaded from open files`
     );
 }
 
