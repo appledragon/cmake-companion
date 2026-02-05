@@ -11,21 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseVariables, parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
-
-/**
- * Built-in CMake variables that should not trigger undefined warnings
- */
-const BUILTIN_VARIABLE_PREFIXES = [
-    'CMAKE_', 'PROJECT_', 'CTEST_', 'CPACK_', '_', 
-    'ARGC', 'ARGV', 'ARGN'
-];
-
-const BUILTIN_VARIABLES = new Set([
-    'WIN32', 'UNIX', 'APPLE', 'MSVC', 'MINGW', 'CYGWIN',
-    'BORLAND', 'WATCOM', 'MSYS', 'ANDROID', 'IOS',
-    'TRUE', 'FALSE', 'ON', 'OFF', 'YES', 'NO',
-    'BUILD_SHARED_LIBS', 'EXECUTABLE_OUTPUT_PATH', 'LIBRARY_OUTPUT_PATH'
-]);
+import { isBuiltInVariable, BUILTIN_VARIABLE_PREFIXES, BUILTIN_VARIABLES } from '../utils/cmakeBuiltins';
 
 /**
  * CMake block pairs for matching
@@ -215,7 +201,7 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
             const varName = variable.variableName;
             
             // Skip if it's a built-in variable
-            if (this.isBuiltInVariable(varName)) {
+            if (isBuiltInVariable(varName)) {
                 continue;
             }
             
@@ -242,16 +228,6 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
             diagnostic.code = 'undefined-variable';
             diagnostics.push(diagnostic);
         }
-    }
-    
-    /**
-     * Check if a variable name is a built-in CMake variable
-     */
-    private isBuiltInVariable(name: string): boolean {
-        if (BUILTIN_VARIABLES.has(name)) {
-            return true;
-        }
-        return BUILTIN_VARIABLE_PREFIXES.some(prefix => name.startsWith(prefix));
     }
     
     /**

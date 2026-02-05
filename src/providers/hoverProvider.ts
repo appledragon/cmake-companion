@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { parsePaths, parseVariables, CMakePathMatch } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
+import { isBuiltInVariable, getBuiltInVariableType, isNonPathVariable } from '../utils/cmakeBuiltins';
 
 export class CMakeHoverProvider implements vscode.HoverProvider {
     
@@ -109,9 +110,32 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
             markdown.appendMarkdown(`⚠️ **Unresolved variables:** ${resolved.unresolvedVariables.map(v => `\`${v}\``).join(', ')}\n\n`);
         }
         
-        if (resolved.exists) {
-            markdown.appendMarkdown('✅ **File exists**\n\n');
-            markdown.appendMarkdown(`[Open file](${vscode.Uri.file(resolved.resolved).toString()})`);
+        // Determine how to show file existence status based on path content
+        const pathInfo = this.analyzePathVariables(match);
+        
+        if (pathInfo.isNonPathVariable) {
+            // Path contains non-path variables (like CMAKE_CXX_STANDARD), don't show file status
+            markdown.appendMarkdown(`📌 *Contains CMake configuration variable*`);
+        } else if (resolved.exists) {
+            // Check if it's a directory or file
+            try {
+                const stat = fs.statSync(resolved.resolved);
+                if (stat.isDirectory()) {
+                    markdown.appendMarkdown('✅ **Directory exists**\n\n');
+                } else {
+                    markdown.appendMarkdown('✅ **File exists**\n\n');
+                }
+                markdown.appendMarkdown(`[Open](${vscode.Uri.file(resolved.resolved).toString()})`);
+            } catch {
+                markdown.appendMarkdown('✅ **File exists**\n\n');
+                markdown.appendMarkdown(`[Open file](${vscode.Uri.file(resolved.resolved).toString()})`);
+            }
+        } else if (pathInfo.isDirectoryPath) {
+            // Path likely represents a directory (from built-in directory variables)
+            markdown.appendMarkdown('📁 *Directory path (may not exist yet)*');
+        } else if (pathInfo.hasOnlyBuiltInVariables && resolved.unresolvedVariables.length === 0) {
+            // All variables are resolved built-ins, but path doesn't exist
+            markdown.appendMarkdown('❌ **Path not found**');
         } else {
             markdown.appendMarkdown('❌ **File not found**');
         }
@@ -124,6 +148,59 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
     }
     
     /**
+     * Analyze the variables in a path to determine the path type
+     */
+    private analyzePathVariables(match: CMakePathMatch): {
+        isDirectoryPath: boolean;
+        isNonPathVariable: boolean;
+        hasOnlyBuiltInVariables: boolean;
+    } {
+        if (!match.variables || match.variables.length === 0) {
+            return {
+                isDirectoryPath: false,
+                isNonPathVariable: false,
+                hasOnlyBuiltInVariables: true
+            };
+        }
+        
+        let isDirectoryPath = false;
+        let isNonPathVariable = false;
+        let hasOnlyBuiltInVariables = true;
+        
+        for (const variable of match.variables) {
+            const varName = variable.variableName;
+            const varType = getBuiltInVariableType(varName);
+            
+            if (varType === 'directory') {
+                isDirectoryPath = true;
+            } else if (varType === 'value') {
+                isNonPathVariable = true;
+            }
+            
+            // Check if it's a known built-in
+            if (!isBuiltInVariable(varName)) {
+                hasOnlyBuiltInVariables = false;
+            }
+        }
+        
+        // If path is just a single variable (e.g., ${CMAKE_SOURCE_DIR}), check its type
+        if (match.variables.length === 1 && match.fullPath === `\${${match.variables[0].variableName}}`) {
+            const varType = getBuiltInVariableType(match.variables[0].variableName);
+            if (varType === 'directory') {
+                isDirectoryPath = true;
+            } else if (varType === 'value') {
+                isNonPathVariable = true;
+            }
+        }
+        
+        return {
+            isDirectoryPath,
+            isNonPathVariable,
+            hasOnlyBuiltInVariables
+        };
+    }
+    
+    /**
      * Create hover content for a CMake variable
      */
     private createVariableHover(
@@ -133,6 +210,8 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         const resolver = getVariableResolver();
         const value = resolver.getVariable(variable.variableName);
         const definition = resolver.getDefinition(variable.variableName);
+        const builtInType = getBuiltInVariableType(variable.variableName);
+        const isBuiltIn = isBuiltInVariable(variable.variableName);
         
         const markdown = new vscode.MarkdownString();
         markdown.isTrusted = true;
@@ -152,11 +231,24 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
                 if (definition.isCache) {
                     markdown.appendMarkdown('📦 *Cache variable*');
                 }
+            } else if (isBuiltIn) {
+                // Show built-in variable type
+                const typeLabels: Record<string, string> = {
+                    'directory': '📁 *Built-in directory variable*',
+                    'file': '📄 *Built-in file path variable*',
+                    'value': '📌 *Built-in configuration variable*',
+                    'unknown': '📌 *Built-in variable*'
+                };
+                markdown.appendMarkdown(typeLabels[builtInType] || '📌 *Built-in variable*');
             } else {
-                markdown.appendMarkdown('📌 *Built-in or custom variable*');
+                markdown.appendMarkdown('📌 *Custom variable*');
             }
         } else {
-            markdown.appendMarkdown('⚠️ **Variable not defined**');
+            if (isBuiltIn) {
+                markdown.appendMarkdown(`📌 *Built-in CMake variable (not yet set)*`);
+            } else {
+                markdown.appendMarkdown('⚠️ **Variable not defined**');
+            }
         }
         
         const startPos = document.positionAt(variable.startIndex);
