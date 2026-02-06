@@ -73,7 +73,10 @@
         },
         "cmake-companion.formatting.style": {
           "type": "string",
-          "enum": ["default", "google"],
+          "enum": [
+            "default",
+            "google"
+          ],
           "default": "google",
           "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
         },
@@ -123,7 +126,10 @@
     "languages": [
       {
         "id": "cmake",
-        "aliases": ["CMake", "cmake"],
+        "aliases": [
+          "CMake",
+          "cmake"
+        ],
         "extensions": [
           ".cmake"
         ],
@@ -144,14 +150,30 @@
       {
         "language": "cmake",
         "scopes": {
-          "variable": ["variable.other.cmake"],
-          "variable.readonly": ["variable.other.constant.cmake"],
-          "variable.defaultLibrary": ["support.variable.cmake"],
-          "function": ["entity.name.function.cmake"],
-          "function.defaultLibrary": ["support.function.cmake"],
-          "keyword": ["keyword.control.cmake"],
-          "namespace": ["entity.name.namespace.cmake"],
-          "property": ["variable.other.property.cmake"]
+          "variable": [
+            "variable.other.cmake"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.cmake"
+          ],
+          "variable.defaultLibrary": [
+            "support.variable.cmake"
+          ],
+          "function": [
+            "entity.name.function.cmake"
+          ],
+          "function.defaultLibrary": [
+            "support.function.cmake"
+          ],
+          "keyword": [
+            "keyword.control.cmake"
+          ],
+          "namespace": [
+            "entity.name.namespace.cmake"
+          ],
+          "property": [
+            "variable.other.property.cmake"
+          ]
         }
       }
     ],
@@ -183,9 +205,11 @@
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
     "test": "node ./dist/test/runTest.js",
-    "test:unit": "mocha --require ts-node/register 'src/test/**/*.test.ts'"
+    "test:unit": "mocha --require ts-node/register 'src/test/**/*.test.ts'",
+    "test:coverage": "nyc mocha --require ts-node/register 'src/test/**/*.test.ts'"
   },
   "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "^18.x",
@@ -196,6 +220,7 @@
     "eslint": "^8.39.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
+    "nyc": "^17.1.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4"
   },

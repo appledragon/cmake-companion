@@ -4,90 +4,27 @@
  */
 
 import * as vscode from 'vscode';
+import {
+    CMakeFormattingStyle,
+    CMakeFormattingOptions,
+    DEFAULT_OPTIONS,
+    STYLE_PRESETS,
+    INDENT_INCREASE_COMMANDS,
+    INDENT_DECREASE_COMMANDS,
+    formatLine,
+    wrapLineIfNeeded,
+    createIndent,
+    formatCommand,
+    formatParentheses,
+    normalizeWhitespace,
+    splitArguments,
+    containsCommentOutsideString,
+    getIndentation
+} from '../utils/formattingUtils';
 
-/**
- * Supported formatting style presets
- */
-export type CMakeFormattingStyle = 'default' | 'google';
-
-/**
- * Formatting options for CMake files
- */
-export interface CMakeFormattingOptions {
-    /** Number of spaces for indentation (default: 2) */
-    tabSize: number;
-    /** Use spaces instead of tabs (default: true) */
-    insertSpaces: boolean;
-    /** Maximum line length (0 = no limit) */
-    maxLineLength: number;
-    /** Add space after opening parenthesis */
-    spaceAfterOpenParen: boolean;
-    /** Add space before closing parenthesis */
-    spaceBeforeCloseParen: boolean;
-    /** Uppercase command names */
-    uppercaseCommands: boolean;
-}
-
-/**
- * Default formatting options
- */
-const DEFAULT_OPTIONS: CMakeFormattingOptions = {
-    tabSize: 2,
-    insertSpaces: true,
-    maxLineLength: 0,
-    spaceAfterOpenParen: false,
-    spaceBeforeCloseParen: false,
-    uppercaseCommands: false
-};
-
-/**
- * Google-style formatting options
- * Inspired by clang-format's Google style:
- * - Lowercase commands
- * - 2 spaces for indentation
- * - No spaces inside parentheses
- * - 80 character line length limit
- */
-const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
-    tabSize: 2,
-    insertSpaces: true,
-    maxLineLength: 80,
-    spaceAfterOpenParen: false,
-    spaceBeforeCloseParen: false,
-    uppercaseCommands: false
-};
-
-/**
- * Style presets mapping
- */
-const STYLE_PRESETS: Record<CMakeFormattingStyle, CMakeFormattingOptions> = {
-    'default': DEFAULT_OPTIONS,
-    'google': GOOGLE_STYLE_OPTIONS
-};
-
-/**
- * Commands that increase indentation after them
- */
-const INDENT_INCREASE_COMMANDS = new Set([
-    'if', 'elseif', 'else',
-    'foreach',
-    'while',
-    'function',
-    'macro',
-    'block'
-]);
-
-/**
- * Commands that decrease indentation before them
- */
-const INDENT_DECREASE_COMMANDS = new Set([
-    'endif', 'elseif', 'else',
-    'endforeach',
-    'endwhile',
-    'endfunction',
-    'endmacro',
-    'endblock'
-]);
+// Re-export types for consumers
+export type { CMakeFormattingOptions } from '../utils/formattingUtils';
+export type { CMakeFormattingStyle } from '../utils/formattingUtils';
 
 /**
  * Document Formatting Provider for CMake files
@@ -137,8 +74,8 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
             }
             
             // Format the line
-            const formattedLine = this.formatLine(trimmedLine, indentLevel, formattingOptions);
-            const wrappedLines = this.wrapLineIfNeeded(formattedLine, indentLevel, formattingOptions);
+            const formattedLine = formatLine(trimmedLine, indentLevel, formattingOptions);
+            const wrappedLines = wrapLineIfNeeded(formattedLine, indentLevel, formattingOptions);
             formattedLines.push(...wrappedLines);
             
             // Increase indent after certain commands
@@ -185,190 +122,6 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
         };
     }
     
-    /**
-     * Format a single line
-     */
-    private formatLine(
-        line: string,
-        indentLevel: number,
-        options: CMakeFormattingOptions
-    ): string {
-        // Check if line is a comment
-        if (line.startsWith('#')) {
-            return this.createIndent(indentLevel, options) + line;
-        }
-        
-        // Format command name if present
-        let formattedLine = this.formatCommand(line, options);
-        
-        // Format parentheses spacing
-        formattedLine = this.formatParentheses(formattedLine, options);
-        
-        // Normalize whitespace
-        formattedLine = this.normalizeWhitespace(formattedLine);
-        
-        // Add indentation
-        return this.createIndent(indentLevel, options) + formattedLine;
-    }
-
-    /**
-     * Wrap long lines based on maxLineLength
-     * Only wraps simple command calls like command(arg1 arg2 ...)
-     */
-    private wrapLineIfNeeded(
-        formattedLine: string,
-        indentLevel: number,
-        options: CMakeFormattingOptions
-    ): string[] {
-        if (options.maxLineLength <= 0 || formattedLine.length <= options.maxLineLength) {
-            return [formattedLine];
-        }
-
-        const trimmed = formattedLine.trim();
-        if (!trimmed || trimmed.startsWith('#')) {
-            return [formattedLine];
-        }
-
-        if (this.containsCommentOutsideString(trimmed)) {
-            return [formattedLine];
-        }
-
-        const commandMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/);
-        if (!commandMatch) {
-            return [formattedLine];
-        }
-
-        const command = commandMatch[1];
-        const argsString = commandMatch[2].trim();
-        if (!argsString) {
-            return [formattedLine];
-        }
-
-        const args = this.splitArguments(argsString);
-        if (args.length <= 1) {
-            return [formattedLine];
-        }
-
-        const baseIndent = this.createIndent(indentLevel, options);
-        const continuationIndent = this.createIndent(indentLevel + 1, options);
-        const wrapped: string[] = [];
-
-        wrapped.push(`${baseIndent}${command}(`);
-        for (const arg of args) {
-            wrapped.push(`${continuationIndent}${arg}`);
-        }
-        wrapped.push(`${baseIndent})`);
-
-        return wrapped;
-    }
-    
-    /**
-     * Create indentation string
-     */
-    private createIndent(level: number, options: CMakeFormattingOptions): string {
-        const indentChar = options.insertSpaces ? ' '.repeat(options.tabSize) : '\t';
-        return indentChar.repeat(level);
-    }
-    
-    /**
-     * Format command name (uppercase or lowercase)
-     */
-    private formatCommand(line: string, options: CMakeFormattingOptions): string {
-        const commandMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-        if (commandMatch) {
-            const commandName = commandMatch[1];
-            const formattedCommand = options.uppercaseCommands 
-                ? commandName.toUpperCase() 
-                : commandName.toLowerCase();
-            return line.replace(commandMatch[1], formattedCommand);
-        }
-        return line;
-    }
-    
-    /**
-     * Format parentheses spacing
-     */
-    private formatParentheses(line: string, options: CMakeFormattingOptions): string {
-        let result = line;
-        
-        // Handle opening parenthesis
-        if (options.spaceAfterOpenParen) {
-            // Add space after ( if not present
-            result = result.replace(/\(\s*/g, '( ');
-        } else {
-            // Remove space after ( if present
-            result = result.replace(/\(\s+/g, '(');
-        }
-        
-        // Handle closing parenthesis
-        if (options.spaceBeforeCloseParen) {
-            // Add space before ) if not present
-            result = result.replace(/\s*\)/g, ' )');
-        } else {
-            // Remove space before ) if present
-            result = result.replace(/\s+\)/g, ')');
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Normalize whitespace in the line
-     * Collapses multiple consecutive spaces to a single space outside of quoted strings.
-     * Note: This handles basic cases but may not correctly handle:
-     * - Bracket arguments [[ ... ]]
-     * - Escaped quotes within strings
-     * - Generator expressions with nested content
-     */
-    private normalizeWhitespace(line: string): string {
-        let result = '';
-        let inString = false;
-        let lastChar = '';
-        
-        for (const char of line) {
-            if (char === '"' && lastChar !== '\\') {
-                inString = !inString;
-            }
-            
-            if (!inString && char === ' ' && lastChar === ' ') {
-                continue; // Skip multiple spaces
-            }
-            
-            result += char;
-            lastChar = char;
-        }
-        
-        return result;
-    }
-
-    /**
-     * Split arguments by whitespace while respecting quoted strings
-     */
-    private splitArguments(args: string): string[] {
-        return args.match(/"[^"\\]*(?:\\.[^"\\]*)*"|\S+/g) ?? [];
-    }
-
-    /**
-     * Detect comments outside of quoted strings
-     */
-    private containsCommentOutsideString(line: string): boolean {
-        let inString = false;
-        let lastChar = '';
-
-        for (const char of line) {
-            if (char === '"' && lastChar !== '\\') {
-                inString = !inString;
-            }
-
-            if (!inString && char === '#') {
-                return true;
-            }
-
-            lastChar = char;
-        }
-
-        return false;
-    }
 }
 
 /**
@@ -448,7 +201,7 @@ export class CMakeOnTypeFormattingProvider implements vscode.OnTypeFormattingEdi
         const prevLineText = prevLine.text.trim();
         
         // Determine base indentation from previous line
-        const prevIndent = this.getIndentation(prevLine.text);
+        const prevIndent = getIndentation(prevLine.text);
         let newIndent = prevIndent;
         
         // Check if previous line ends with command that increases indent
@@ -477,7 +230,7 @@ export class CMakeOnTypeFormattingProvider implements vscode.OnTypeFormattingEdi
         }
         
         // Only create edit if indentation needs to change
-        const currentIndent = this.getIndentation(currentLine.text);
+        const currentIndent = getIndentation(currentLine.text);
         if (currentIndent !== newIndent) {
             const range = new vscode.Range(
                 position.line, 0,
@@ -487,13 +240,5 @@ export class CMakeOnTypeFormattingProvider implements vscode.OnTypeFormattingEdi
         }
         
         return null;
-    }
-    
-    /**
-     * Get indentation from the start of a line
-     */
-    private getIndentation(line: string): string {
-        const match = line.match(/^(\s*)/);
-        return match ? match[1] : '';
     }
 }

@@ -12,29 +12,7 @@ import * as path from 'path';
 import { parseVariables, parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
 import { isBuiltInVariable, BUILTIN_VARIABLE_PREFIXES, BUILTIN_VARIABLES } from '../utils/cmakeBuiltins';
-
-/**
- * CMake block pairs for matching
- */
-const BLOCK_PAIRS: Array<{ start: string; end: string; name: string }> = [
-    { start: 'if', end: 'endif', name: 'if/endif' },
-    { start: 'foreach', end: 'endforeach', name: 'foreach/endforeach' },
-    { start: 'while', end: 'endwhile', name: 'while/endwhile' },
-    { start: 'function', end: 'endfunction', name: 'function/endfunction' },
-    { start: 'macro', end: 'endmacro', name: 'macro/endmacro' },
-    { start: 'block', end: 'endblock', name: 'block/endblock' },
-];
-
-/**
- * Deprecated CMake commands with suggested alternatives
- */
-const DEPRECATED_COMMANDS: Map<string, string> = new Map([
-    ['include_directories', 'target_include_directories'],
-    ['link_directories', 'target_link_directories'],
-    ['link_libraries', 'target_link_libraries'],
-    ['add_definitions', 'target_compile_definitions'],
-    ['add_compile_options', 'target_compile_options (for target-specific)'],
-]);
+import { BLOCK_PAIRS, DEPRECATED_COMMANDS } from '../utils/diagnosticUtils';
 
 interface BlockInfo {
     type: 'start' | 'end';

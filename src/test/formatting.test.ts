@@ -3,46 +3,23 @@
  */
 
 import * as assert from 'assert';
-
-// Import the formatting helper functions by testing the module directly
-// Note: We test the core logic that doesn't require VS Code types
-
-/**
- * Formatting options for CMake files (matching the interface in formattingProvider.ts)
- */
-interface CMakeFormattingOptions {
-    tabSize: number;
-    insertSpaces: boolean;
-    maxLineLength: number;
-    spaceAfterOpenParen: boolean;
-    spaceBeforeCloseParen: boolean;
-    uppercaseCommands: boolean;
-}
-
-/**
- * Default formatting options
- */
-const DEFAULT_OPTIONS: CMakeFormattingOptions = {
-    tabSize: 2,
-    insertSpaces: true,
-    maxLineLength: 0,
-    spaceAfterOpenParen: false,
-    spaceBeforeCloseParen: false,
-    uppercaseCommands: false
-};
-
-/**
- * Google-style formatting options
- * Inspired by clang-format's Google style
- */
-const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
-    tabSize: 2,
-    insertSpaces: true,
-    maxLineLength: 80,
-    spaceAfterOpenParen: false,
-    spaceBeforeCloseParen: false,
-    uppercaseCommands: false
-};
+import {
+    CMakeFormattingOptions,
+    DEFAULT_OPTIONS,
+    GOOGLE_STYLE_OPTIONS,
+    INDENT_INCREASE_COMMANDS,
+    INDENT_DECREASE_COMMANDS,
+    createIndent,
+    formatCommand,
+    formatParentheses,
+    normalizeWhitespace,
+    splitArguments,
+    containsCommentOutsideString,
+    formatLine,
+    wrapLineIfNeeded,
+    getIndentation,
+    formatCMakeDocument
+} from '../utils/formattingUtils';
 
 describe('CMake Formatting Logic', () => {
     
@@ -69,31 +46,10 @@ describe('CMake Formatting Logic', () => {
             assert.strictEqual(DEFAULT_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.tabSize);
             assert.strictEqual(DEFAULT_OPTIONS.insertSpaces, GOOGLE_STYLE_OPTIONS.insertSpaces);
             assert.notStrictEqual(DEFAULT_OPTIONS.maxLineLength, GOOGLE_STYLE_OPTIONS.maxLineLength);
-            assert.strictEqual(DEFAULT_OPTIONS.spaceAfterOpenParen, GOOGLE_STYLE_OPTIONS.spaceAfterOpenParen);
-            assert.strictEqual(DEFAULT_OPTIONS.spaceBeforeCloseParen, GOOGLE_STYLE_OPTIONS.spaceBeforeCloseParen);
-            assert.strictEqual(DEFAULT_OPTIONS.uppercaseCommands, GOOGLE_STYLE_OPTIONS.uppercaseCommands);
         });
     });
     
     describe('Indentation Logic', () => {
-        const INDENT_INCREASE_COMMANDS = new Set([
-            'if', 'elseif', 'else',
-            'foreach',
-            'while',
-            'function',
-            'macro',
-            'block'
-        ]);
-        
-        const INDENT_DECREASE_COMMANDS = new Set([
-            'endif', 'elseif', 'else',
-            'endforeach',
-            'endwhile',
-            'endfunction',
-            'endmacro',
-            'endblock'
-        ]);
-        
         it('should identify indent increase commands', () => {
             assert.strictEqual(INDENT_INCREASE_COMMANDS.has('if'), true);
             assert.strictEqual(INDENT_INCREASE_COMMANDS.has('foreach'), true);
@@ -115,113 +71,60 @@ describe('CMake Formatting Logic', () => {
     });
     
     describe('Command Formatting', () => {
-        function formatCommandName(line: string, uppercase: boolean): string {
-            const commandMatch = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-            if (commandMatch) {
-                const commandName = commandMatch[1];
-                const formattedCommand = uppercase 
-                    ? commandName.toUpperCase() 
-                    : commandName.toLowerCase();
-                return line.replace(commandMatch[1], formattedCommand);
-            }
-            return line;
-        }
-        
         it('should convert command to lowercase', () => {
-            assert.strictEqual(formatCommandName('SET(VAR value)', false), 'set(VAR value)');
-            assert.strictEqual(formatCommandName('IF(condition)', false), 'if(condition)');
+            assert.strictEqual(formatCommand('SET(VAR value)', { ...DEFAULT_OPTIONS, uppercaseCommands: false }), 'set(VAR value)');
+            assert.strictEqual(formatCommand('IF(condition)', { ...DEFAULT_OPTIONS, uppercaseCommands: false }), 'if(condition)');
         });
         
         it('should convert command to uppercase', () => {
-            assert.strictEqual(formatCommandName('set(VAR value)', true), 'SET(VAR value)');
-            assert.strictEqual(formatCommandName('if(condition)', true), 'IF(condition)');
+            assert.strictEqual(formatCommand('set(VAR value)', { ...DEFAULT_OPTIONS, uppercaseCommands: true }), 'SET(VAR value)');
+            assert.strictEqual(formatCommand('if(condition)', { ...DEFAULT_OPTIONS, uppercaseCommands: true }), 'IF(condition)');
         });
         
         it('should handle mixed case', () => {
-            assert.strictEqual(formatCommandName('SeT(VAR value)', false), 'set(VAR value)');
-            assert.strictEqual(formatCommandName('SeT(VAR value)', true), 'SET(VAR value)');
+            assert.strictEqual(formatCommand('SeT(VAR value)', { ...DEFAULT_OPTIONS, uppercaseCommands: false }), 'set(VAR value)');
+            assert.strictEqual(formatCommand('SeT(VAR value)', { ...DEFAULT_OPTIONS, uppercaseCommands: true }), 'SET(VAR value)');
         });
         
         it('should format commands according to Google style (lowercase)', () => {
-            // Google style uses lowercase commands
-            const googleStyleUppercase = GOOGLE_STYLE_OPTIONS.uppercaseCommands;
-            assert.strictEqual(formatCommandName('SET(VAR value)', googleStyleUppercase), 'set(VAR value)');
-            assert.strictEqual(formatCommandName('ADD_EXECUTABLE(app main.cpp)', googleStyleUppercase), 'add_executable(app main.cpp)');
+            assert.strictEqual(formatCommand('SET(VAR value)', GOOGLE_STYLE_OPTIONS), 'set(VAR value)');
+            assert.strictEqual(formatCommand('ADD_EXECUTABLE(app main.cpp)', GOOGLE_STYLE_OPTIONS), 'add_executable(app main.cpp)');
+        });
+
+        it('should not modify non-command lines', () => {
+            assert.strictEqual(formatCommand('# comment', DEFAULT_OPTIONS), '# comment');
+            assert.strictEqual(formatCommand('plain text', DEFAULT_OPTIONS), 'plain text');
         });
     });
     
     describe('Parentheses Formatting', () => {
-        function formatParentheses(line: string, spaceAfterOpen: boolean, spaceBeforeClose: boolean): string {
-            let result = line;
-            
-            if (spaceAfterOpen) {
-                result = result.replace(/\(\s*/g, '( ');
-            } else {
-                result = result.replace(/\(\s+/g, '(');
-            }
-            
-            if (spaceBeforeClose) {
-                result = result.replace(/\s*\)/g, ' )');
-            } else {
-                result = result.replace(/\s+\)/g, ')');
-            }
-            
-            return result;
-        }
-        
         it('should remove spaces after opening parenthesis', () => {
-            assert.strictEqual(formatParentheses('set( VAR value)', false, false), 'set(VAR value)');
+            assert.strictEqual(formatParentheses('set( VAR value)', { ...DEFAULT_OPTIONS, spaceAfterOpenParen: false }), 'set(VAR value)');
         });
         
         it('should add spaces after opening parenthesis', () => {
-            assert.strictEqual(formatParentheses('set(VAR value)', true, false), 'set( VAR value)');
+            assert.strictEqual(formatParentheses('set(VAR value)', { ...DEFAULT_OPTIONS, spaceAfterOpenParen: true }), 'set( VAR value)');
         });
         
         it('should remove spaces before closing parenthesis', () => {
-            assert.strictEqual(formatParentheses('set(VAR value )', false, false), 'set(VAR value)');
+            assert.strictEqual(formatParentheses('set(VAR value )', { ...DEFAULT_OPTIONS, spaceBeforeCloseParen: false }), 'set(VAR value)');
         });
         
         it('should add spaces before closing parenthesis', () => {
-            assert.strictEqual(formatParentheses('set(VAR value)', false, true), 'set(VAR value )');
+            assert.strictEqual(formatParentheses('set(VAR value)', { ...DEFAULT_OPTIONS, spaceBeforeCloseParen: true }), 'set(VAR value )');
         });
         
         it('should handle both space options', () => {
-            assert.strictEqual(formatParentheses('set(VAR value)', true, true), 'set( VAR value )');
+            assert.strictEqual(formatParentheses('set(VAR value)', { ...DEFAULT_OPTIONS, spaceAfterOpenParen: true, spaceBeforeCloseParen: true }), 'set( VAR value )');
         });
         
         it('should format parentheses according to Google style (no extra spaces)', () => {
-            // Google style has no spaces inside parentheses
-            const result = formatParentheses(
-                'set( VAR value )', 
-                GOOGLE_STYLE_OPTIONS.spaceAfterOpenParen, 
-                GOOGLE_STYLE_OPTIONS.spaceBeforeCloseParen
-            );
+            const result = formatParentheses('set( VAR value )', GOOGLE_STYLE_OPTIONS);
             assert.strictEqual(result, 'set(VAR value)');
         });
     });
     
     describe('Whitespace Normalization', () => {
-        function normalizeWhitespace(line: string): string {
-            let result = '';
-            let inString = false;
-            let lastChar = '';
-            
-            for (const char of line) {
-                if (char === '"' && lastChar !== '\\') {
-                    inString = !inString;
-                }
-                
-                if (!inString && char === ' ' && lastChar === ' ') {
-                    continue;
-                }
-                
-                result += char;
-                lastChar = char;
-            }
-            
-            return result;
-        }
-        
         it('should collapse multiple spaces', () => {
             assert.strictEqual(normalizeWhitespace('set(VAR    value)'), 'set(VAR value)');
         });
@@ -236,32 +139,178 @@ describe('CMake Formatting Logic', () => {
     });
     
     describe('Indentation Creation', () => {
-        function createIndent(level: number, tabSize: number, insertSpaces: boolean): string {
-            const indentChar = insertSpaces ? ' '.repeat(tabSize) : '\t';
-            return indentChar.repeat(level);
-        }
-        
         it('should create spaces indentation', () => {
-            assert.strictEqual(createIndent(1, 2, true), '  ');
-            assert.strictEqual(createIndent(2, 2, true), '    ');
-            assert.strictEqual(createIndent(1, 4, true), '    ');
+            assert.strictEqual(createIndent(1, { ...DEFAULT_OPTIONS, tabSize: 2, insertSpaces: true }), '  ');
+            assert.strictEqual(createIndent(2, { ...DEFAULT_OPTIONS, tabSize: 2, insertSpaces: true }), '    ');
+            assert.strictEqual(createIndent(1, { ...DEFAULT_OPTIONS, tabSize: 4, insertSpaces: true }), '    ');
         });
         
         it('should create tabs indentation', () => {
-            assert.strictEqual(createIndent(1, 2, false), '\t');
-            assert.strictEqual(createIndent(2, 2, false), '\t\t');
+            assert.strictEqual(createIndent(1, { ...DEFAULT_OPTIONS, insertSpaces: false }), '\t');
+            assert.strictEqual(createIndent(2, { ...DEFAULT_OPTIONS, insertSpaces: false }), '\t\t');
         });
         
         it('should handle zero level', () => {
-            assert.strictEqual(createIndent(0, 2, true), '');
+            assert.strictEqual(createIndent(0, DEFAULT_OPTIONS), '');
         });
         
         it('should create Google-style indentation (2 spaces)', () => {
-            const indent = createIndent(1, GOOGLE_STYLE_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.insertSpaces);
-            assert.strictEqual(indent, '  ');
-            
-            const doubleIndent = createIndent(2, GOOGLE_STYLE_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.insertSpaces);
-            assert.strictEqual(doubleIndent, '    ');
+            assert.strictEqual(createIndent(1, GOOGLE_STYLE_OPTIONS), '  ');
+            assert.strictEqual(createIndent(2, GOOGLE_STYLE_OPTIONS), '    ');
+        });
+    });
+
+    describe('splitArguments', () => {
+        it('should split simple arguments', () => {
+            const result = splitArguments('arg1 arg2 arg3');
+            assert.deepStrictEqual(result, ['arg1', 'arg2', 'arg3']);
+        });
+
+        it('should handle quoted strings', () => {
+            const result = splitArguments('arg1 "hello world" arg2');
+            assert.deepStrictEqual(result, ['arg1', '"hello world"', 'arg2']);
+        });
+
+        it('should handle single argument', () => {
+            const result = splitArguments('arg1');
+            assert.deepStrictEqual(result, ['arg1']);
+        });
+
+        it('should handle empty string', () => {
+            const result = splitArguments('');
+            assert.deepStrictEqual(result, []);
+        });
+
+        it('should handle escaped quotes in strings', () => {
+            const result = splitArguments('"hello \\"world\\"" arg2');
+            assert.deepStrictEqual(result, ['"hello \\"world\\""', 'arg2']);
+        });
+    });
+
+    describe('containsCommentOutsideString', () => {
+        it('should detect comment at start', () => {
+            assert.strictEqual(containsCommentOutsideString('# comment'), true);
+        });
+
+        it('should detect comment after code', () => {
+            assert.strictEqual(containsCommentOutsideString('set(VAR value) # comment'), true);
+        });
+
+        it('should not detect hash inside string', () => {
+            assert.strictEqual(containsCommentOutsideString('set(VAR "#not a comment")'), false);
+        });
+
+        it('should detect comment after string', () => {
+            assert.strictEqual(containsCommentOutsideString('set(VAR "value") # comment'), true);
+        });
+
+        it('should return false for no comment', () => {
+            assert.strictEqual(containsCommentOutsideString('set(VAR value)'), false);
+        });
+    });
+
+    describe('formatLine', () => {
+        it('should format a comment line', () => {
+            const result = formatLine('# comment', 1, DEFAULT_OPTIONS);
+            assert.strictEqual(result, '  # comment');
+        });
+
+        it('should format a command line', () => {
+            const result = formatLine('SET(VAR value)', 0, DEFAULT_OPTIONS);
+            assert.strictEqual(result, 'set(VAR value)');
+        });
+
+        it('should apply indentation', () => {
+            const result = formatLine('set(VAR value)', 2, DEFAULT_OPTIONS);
+            assert.strictEqual(result, '    set(VAR value)');
+        });
+    });
+
+    describe('wrapLineIfNeeded', () => {
+        const opts: CMakeFormattingOptions = { ...DEFAULT_OPTIONS, maxLineLength: 30 };
+
+        it('should not wrap short lines', () => {
+            const result = wrapLineIfNeeded('set(VAR value)', 0, opts);
+            assert.deepStrictEqual(result, ['set(VAR value)']);
+        });
+
+        it('should wrap long command lines', () => {
+            const result = wrapLineIfNeeded('target_link_libraries(myapp lib1 lib2 lib3)', 0, opts);
+            assert.ok(result.length > 1);
+            assert.ok(result[0].includes('target_link_libraries('));
+            assert.ok(result[result.length - 1].trim() === ')');
+        });
+
+        it('should not wrap when maxLineLength is 0', () => {
+            const result = wrapLineIfNeeded('very_long_command(arg1 arg2 arg3 arg4 arg5)', 0, DEFAULT_OPTIONS);
+            assert.strictEqual(result.length, 1);
+        });
+
+        it('should not wrap comments', () => {
+            const result = wrapLineIfNeeded('# this is a very long comment that exceeds the limit', 0, opts);
+            assert.strictEqual(result.length, 1);
+        });
+
+        it('should not wrap single-argument commands', () => {
+            const result = wrapLineIfNeeded('set(VARIABLE_WITH_VERY_LONG_NAME)', 0, opts);
+            assert.strictEqual(result.length, 1);
+        });
+    });
+
+    describe('getIndentation', () => {
+        it('should return spaces', () => {
+            assert.strictEqual(getIndentation('  set(VAR)'), '  ');
+        });
+
+        it('should return tabs', () => {
+            assert.strictEqual(getIndentation('\t\tset(VAR)'), '\t\t');
+        });
+
+        it('should return empty for no indent', () => {
+            assert.strictEqual(getIndentation('set(VAR)'), '');
+        });
+
+        it('should return empty for empty line', () => {
+            assert.strictEqual(getIndentation(''), '');
+        });
+    });
+
+    describe('formatCMakeDocument', () => {
+        it('should format a simple document', () => {
+            const input = `cmake_minimum_required(VERSION 3.14)
+project(MyApp)
+IF(WIN32)
+SET(VAR value)
+ENDIF()`;
+            const result = formatCMakeDocument(input, DEFAULT_OPTIONS);
+            const lines = result.split('\n');
+            assert.strictEqual(lines[0], 'cmake_minimum_required(VERSION 3.14)');
+            assert.strictEqual(lines[1], 'project(MyApp)');
+            assert.strictEqual(lines[2], 'if(WIN32)');
+            assert.strictEqual(lines[3], '  set(VAR value)');
+            assert.strictEqual(lines[4], 'endif()');
+        });
+
+        it('should handle nested blocks', () => {
+            const input = `if(A)
+if(B)
+set(X 1)
+endif()
+endif()`;
+            const result = formatCMakeDocument(input, DEFAULT_OPTIONS);
+            const lines = result.split('\n');
+            assert.strictEqual(lines[0], 'if(A)');
+            assert.strictEqual(lines[1], '  if(B)');
+            assert.strictEqual(lines[2], '    set(X 1)');
+            assert.strictEqual(lines[3], '  endif()');
+            assert.strictEqual(lines[4], 'endif()');
+        });
+
+        it('should handle empty lines', () => {
+            const input = `set(A 1)\n\nset(B 2)`;
+            const result = formatCMakeDocument(input, DEFAULT_OPTIONS);
+            const lines = result.split('\n');
+            assert.strictEqual(lines[1], '');
         });
     });
 });

@@ -242,12 +242,29 @@ function extractProjectName(projectPath: string): string {
  * @returns Map of object ID to object definition
  */
 function extractObjectsSection(content: string): Record<string, string> {
-    const objectsMatch = content.match(/objects\s*=\s*\{([\s\S]*?)\n\s*\};/);
-    if (!objectsMatch) {
+    // Find "objects = {" and use brace-counting to find the matching closing "}"
+    const objectsStart = content.match(/objects\s*=\s*\{/);
+    if (!objectsStart || objectsStart.index === undefined) {
         return {};
     }
 
-    const objectsContent = objectsMatch[1];
+    const openBracePos = objectsStart.index + objectsStart[0].length;
+    let braceCount = 1;
+    let pos = openBracePos;
+    while (pos < content.length && braceCount > 0) {
+        if (content[pos] === '{') {
+            braceCount++;
+        } else if (content[pos] === '}') {
+            braceCount--;
+        }
+        pos++;
+    }
+
+    if (braceCount !== 0) {
+        return {};
+    }
+
+    const objectsContent = content.substring(openBracePos, pos - 1);
     const objects: Record<string, string> = {};
     
     // Split by section comments or by object boundaries
