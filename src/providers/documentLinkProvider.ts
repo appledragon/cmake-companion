@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
+import { getBuiltInVariableType, isNonPathVariable } from '../utils/cmakeBuiltins';
 
 export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
     
@@ -63,34 +64,54 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
                 };
             }
             
+            // Skip links for non-path variables (e.g. CMAKE_CXX_STANDARD -> 17)
+            const hasNonPathVar = match.variables.some(v => {
+                const varType = getBuiltInVariableType(v.variableName);
+                return varType === 'value' || isNonPathVariable(v.variableName);
+            });
+            if (hasNonPathVar) {
+                continue;
+            }
+
             // Only create links for paths that can be fully resolved
             if (resolved.unresolvedVariables.length === 0) {
                 const startPos = document.positionAt(match.startIndex);
                 const endPos = document.positionAt(match.endIndex);
                 const range = new vscode.Range(startPos, endPos);
                 
-                // Create a command URI for the resolved path to enable custom handling
-                const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
-                const commandUri = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
+                // For CMake lists (semicolon-separated), use command URI to show quick pick
+                const isList = resolved.resolved.includes(';');
                 
-                const link = new vscode.DocumentLink(range, commandUri);
+                let linkTarget: vscode.Uri;
+                let tooltip: string;
                 
-                // Add tooltip based on path type
-                if (resolved.exists) {
-                    try {
-                        const stat = fs.statSync(resolved.resolved);
-                        if (stat.isDirectory()) {
-                            link.tooltip = `Open directory: ${resolved.resolved}`;
-                        } else {
-                            link.tooltip = `Open file: ${resolved.resolved}`;
-                        }
-                    } catch {
-                        link.tooltip = `Open: ${resolved.resolved}`;
+                if (isList) {
+                    const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
+                    linkTarget = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
+                    const items = resolved.resolved.split(';');
+                    const existCount = items.filter(i => { try { return fs.existsSync(i.trim()); } catch { return false; } }).length;
+                    tooltip = `${existCount}/${items.length} files found (ctrl + click to select)`;
+                } else if (resolved.exists) {
+                    let isDir = false;
+                    try { isDir = fs.statSync(resolved.resolved).isDirectory(); } catch { /* ignore */ }
+                    if (isDir) {
+                        // Directories need the command handler for reveal-in-explorer logic
+                        const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
+                        linkTarget = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
+                        tooltip = `Open directory: ${resolved.resolved}`;
+                    } else {
+                        // Files can use file URI directly — most reliable
+                        linkTarget = vscode.Uri.file(resolved.resolved);
+                        tooltip = `Open file: ${resolved.resolved}`;
                     }
                 } else {
-                    link.tooltip = `Path: ${resolved.resolved} (not found)`;
+                    // Path doesn't exist — use file URI anyway (VS Code will show its own error)
+                    linkTarget = vscode.Uri.file(resolved.resolved);
+                    tooltip = `Path: ${resolved.resolved} (not found)`;
                 }
                 
+                const link = new vscode.DocumentLink(range, linkTarget);
+                link.tooltip = tooltip;
                 links.push(link);
             }
         }

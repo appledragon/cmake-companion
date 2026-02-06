@@ -55,90 +55,73 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Don't scan entire workspace - parse files on-demand when opened
     updateStatusBar();
     
-    // Register document link provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const linkProvider = vscode.languages.registerDocumentLinkProvider(
-            selector,
+    // Register providers once with all selectors to avoid duplicates
+    context.subscriptions.push(
+        vscode.languages.registerDocumentLinkProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeDocumentLinkProvider()
-        );
-        context.subscriptions.push(linkProvider);
-    }
+        )
+    );
     
-    // Register hover provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const hoverProvider = vscode.languages.registerHoverProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerHoverProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeHoverProvider()
-        );
-        context.subscriptions.push(hoverProvider);
-    }
+        )
+    );
     
-    // Register definition provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const definitionProvider = vscode.languages.registerDefinitionProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerDefinitionProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeDefinitionProvider()
-        );
-        context.subscriptions.push(definitionProvider);
-    }
+        )
+    );
     
-    // Register semantic tokens provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const semanticTokensProvider = vscode.languages.registerDocumentSemanticTokensProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerDocumentSemanticTokensProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeSemanticTokensProvider(),
             legend
-        );
-        context.subscriptions.push(semanticTokensProvider);
-    }
+        )
+    );
     
-    // Register document formatting provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeDocumentFormattingProvider()
-        );
-        context.subscriptions.push(formattingProvider);
-    }
+        )
+    );
     
-    // Register document range formatting provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const rangeFormattingProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerDocumentRangeFormattingEditProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeDocumentRangeFormattingProvider()
-        );
-        context.subscriptions.push(rangeFormattingProvider);
-    }
+        )
+    );
     
-    // Register on-type formatting provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const onTypeFormattingProvider = vscode.languages.registerOnTypeFormattingEditProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerOnTypeFormattingEditProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeOnTypeFormattingProvider(),
-            CMakeOnTypeFormattingProvider.triggerCharacters[0], // First trigger char
-            ...CMakeOnTypeFormattingProvider.triggerCharacters.slice(1) // Rest of trigger chars
-        );
-        context.subscriptions.push(onTypeFormattingProvider);
-    }
+            CMakeOnTypeFormattingProvider.triggerCharacters[0],
+            ...CMakeOnTypeFormattingProvider.triggerCharacters.slice(1)
+        )
+    );
     
-    // Register completion provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const completionProvider = vscode.languages.registerCompletionItemProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerCompletionItemProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeCompletionProvider(),
-            '$', '{' // Trigger characters for variable completion
-        );
-        context.subscriptions.push(completionProvider);
-    }
+            '$', '{'
+        )
+    );
     
-    // Register folding range provider for all supported languages/patterns
-    for (const selector of SUPPORTED_LANGUAGES) {
-        const foldingProvider = vscode.languages.registerFoldingRangeProvider(
-            selector,
+    context.subscriptions.push(
+        vscode.languages.registerFoldingRangeProvider(
+            SUPPORTED_LANGUAGES,
             new CMakeFoldingRangeProvider()
-        );
-        context.subscriptions.push(foldingProvider);
-    }
+        )
+    );
     
     // Initialize diagnostic provider (singleton with its own lifecycle management)
     const diagnosticProvider = getDiagnosticProvider();
@@ -561,6 +544,36 @@ async function refreshVariablesCommandHandler(): Promise<void> {
  * For directories: reveals in explorer if in workspace, opens new window if outside
  */
 async function openPathCommandHandler(targetPath: string): Promise<void> {
+    // Handle CMake list (semicolon-separated paths)
+    if (targetPath.includes(';')) {
+        const items = targetPath.split(';').map(p => p.trim()).filter(p => p.length > 0);
+        const pickItems = items.map(p => {
+            let exists = false;
+            let isDir = false;
+            try {
+                exists = fs.existsSync(p);
+                if (exists) { isDir = fs.statSync(p).isDirectory(); }
+            } catch { /* ignore */ }
+            const icon = exists ? (isDir ? '$(folder)' : '$(file)') : '$(warning)';
+            const status = exists ? '' : ' (not found)';
+            return { label: `${icon} ${path.basename(p)}${status}`, description: p, fullPath: p, exists };
+        });
+        
+        const selected = await vscode.window.showQuickPick(pickItems, {
+            placeHolder: 'Select a file to open',
+            canPickMany: false
+        });
+        
+        if (selected) {
+            if (!selected.exists) {
+                vscode.window.showErrorMessage(`Path does not exist: ${selected.fullPath}`);
+                return;
+            }
+            return openPathCommandHandler(selected.fullPath);
+        }
+        return;
+    }
+    
     if (!fs.existsSync(targetPath)) {
         vscode.window.showErrorMessage(`Path does not exist: ${targetPath}`);
         return;

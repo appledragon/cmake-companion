@@ -102,9 +102,34 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         markdown.appendMarkdown('**CMake Path**\n\n');
         markdown.appendMarkdown(`**Original:** \`${match.fullPath}\`\n\n`);
         
-        // Format resolved value - if it contains semicolons (CMake list), display as list
-        const resolvedDisplay = this.formatValueForDisplay(resolved.resolved);
-        markdown.appendMarkdown(`**Resolved:** ${resolvedDisplay}\n\n`);
+        // Check if resolved value is a CMake list (semicolon-separated)
+        const isList = resolved.resolved.includes(';');
+        
+        if (isList) {
+            // Multi-value path (CMake list) — check each file individually
+            const items = resolved.resolved.split(';');
+            markdown.appendMarkdown('**Resolved:**\n\n');
+            for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed) { continue; }
+                let itemExists = false;
+                let isDir = false;
+                try {
+                    itemExists = fs.existsSync(trimmed);
+                    if (itemExists) {
+                        isDir = fs.statSync(trimmed).isDirectory();
+                    }
+                } catch {
+                    // ignore
+                }
+                const icon = itemExists ? (isDir ? '📁' : '✅') : '❌';
+                markdown.appendMarkdown(`- ${icon} \`${trimmed}\`\n`);
+            }
+            markdown.appendMarkdown('\n');
+        } else {
+            // Single value
+            markdown.appendMarkdown(`**Resolved:** \`${resolved.resolved}\`\n\n`);
+        }
         
         if (resolved.unresolvedVariables.length > 0) {
             markdown.appendMarkdown(`⚠️ **Unresolved variables:** ${resolved.unresolvedVariables.map(v => `\`${v}\``).join(', ')}\n\n`);
@@ -116,26 +141,32 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         if (pathInfo.isNonPathVariable) {
             // Path contains non-path variables (like CMAKE_CXX_STANDARD), don't show file status
             markdown.appendMarkdown(`📌 *Contains CMake configuration variable*`);
+        } else if (isList) {
+            // Already showed per-file status above, no need for an overall status
         } else if (resolved.exists) {
             // Check if it's a directory or file
             try {
                 const stat = fs.statSync(resolved.resolved);
                 if (stat.isDirectory()) {
-                    markdown.appendMarkdown('✅ **Directory exists**\n\n');
+                    markdown.appendMarkdown('✅ **Directory exists**');
                 } else {
-                    markdown.appendMarkdown('✅ **File exists**\n\n');
+                    markdown.appendMarkdown('✅ **File exists**');
                 }
-                markdown.appendMarkdown(`[Open](${vscode.Uri.file(resolved.resolved).toString()})`);
             } catch {
-                markdown.appendMarkdown('✅ **File exists**\n\n');
-                markdown.appendMarkdown(`[Open file](${vscode.Uri.file(resolved.resolved).toString()})`);
+                markdown.appendMarkdown('✅ **File exists**');
             }
         } else if (pathInfo.isDirectoryPath) {
             // Path likely represents a directory (from built-in directory variables)
             markdown.appendMarkdown('📁 *Directory path (may not exist yet)*');
+        } else if (pathInfo.isFilePath && resolved.unresolvedVariables.length > 0) {
+            // Built-in file/tool variable that hasn't been resolved (e.g. CMAKE_COMMAND)
+            markdown.appendMarkdown('🔧 *Tool/executable path (resolved at configure time)*');
         } else if (pathInfo.hasOnlyBuiltInVariables && resolved.unresolvedVariables.length === 0) {
             // All variables are resolved built-ins, but path doesn't exist
             markdown.appendMarkdown('❌ **Path not found**');
+        } else if (resolved.unresolvedVariables.length > 0) {
+            // Has unresolved variables — can't determine if the path exists
+            markdown.appendMarkdown('⚠️ *Path cannot be verified (unresolved variables)*');
         } else {
             markdown.appendMarkdown('❌ **File not found**');
         }
@@ -152,18 +183,21 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
      */
     private analyzePathVariables(match: CMakePathMatch): {
         isDirectoryPath: boolean;
+        isFilePath: boolean;
         isNonPathVariable: boolean;
         hasOnlyBuiltInVariables: boolean;
     } {
         if (!match.variables || match.variables.length === 0) {
             return {
                 isDirectoryPath: false,
+                isFilePath: false,
                 isNonPathVariable: false,
                 hasOnlyBuiltInVariables: true
             };
         }
         
         let isDirectoryPath = false;
+        let isFilePath = false;
         let isNonPathVariable = false;
         let hasOnlyBuiltInVariables = true;
         
@@ -173,6 +207,8 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
             
             if (varType === 'directory') {
                 isDirectoryPath = true;
+            } else if (varType === 'file') {
+                isFilePath = true;
             } else if (varType === 'value') {
                 isNonPathVariable = true;
             }
@@ -188,6 +224,8 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
             const varType = getBuiltInVariableType(match.variables[0].variableName);
             if (varType === 'directory') {
                 isDirectoryPath = true;
+            } else if (varType === 'file') {
+                isFilePath = true;
             } else if (varType === 'value') {
                 isNonPathVariable = true;
             }
@@ -195,6 +233,7 @@ export class CMakeHoverProvider implements vscode.HoverProvider {
         
         return {
             isDirectoryPath,
+            isFilePath,
             isNonPathVariable,
             hasOnlyBuiltInVariables
         };
