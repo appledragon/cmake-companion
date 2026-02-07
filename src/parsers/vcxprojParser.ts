@@ -36,10 +36,20 @@ export interface VcxprojProject {
     type: 'Application' | 'StaticLibrary' | 'DynamicLibrary';
     sourceFiles: string[];
     headerFiles: string[];
+    /** Resource files (.rc) */
+    resourceFiles: string[];
+    /** None items (files that are part of the project but not compiled) */
+    noneFiles: string[];
     includeDirectories: string[];
     preprocessorDefinitions: string[];
     libraries: string[];
+    /** References to other projects in the solution */
+    projectReferences: ProjectReference[];
     outputDirectory?: string;
+    /** Intermediate directory for build artifacts */
+    intermediateDirectory?: string;
+    /** Target name override (default is project name) */
+    targetName?: string;
     /** Additional compiler options (from AdditionalOptions) */
     additionalCompileOptions?: string[];
     /** Additional linker options (from Link/AdditionalOptions) */
@@ -48,6 +58,8 @@ export interface VcxprojProject {
     additionalLibraryDirectories?: string[];
     /** C++ language standard (e.g., 11, 14, 17, 20, 23) */
     cxxStandard?: number;
+    /** C language standard (e.g., 11, 17) */
+    cStandard?: number;
     /** Windows SDK version (e.g., "10.0.19041.0") */
     windowsSdkVersion?: string;
     /** Platform toolset (e.g., "v142", "v143") */
@@ -72,12 +84,38 @@ export interface VcxprojProject {
     treatWarningAsError?: boolean;
     /** Multi-processor compilation */
     multiProcessorCompilation?: boolean;
+    /** Function-level linking */
+    functionLevelLinking?: boolean;
+    /** Intrinsic functions */
+    intrinsicFunctions?: boolean;
+    /** Whole program optimization (LTO) */
+    wholeProgramOptimization?: boolean;
+    /** Generate debug information (linker) */
+    generateDebugInformation?: boolean | string;
+    /** Minimal rebuild */
+    minimalRebuild?: boolean;
+    /** String pooling */
+    stringPooling?: boolean;
+    /** Conformance mode (/permissive-) */
+    conformanceMode?: boolean;
     /** Precompiled header configuration */
     pchConfig?: PchConfig;
     /** Build events (pre-build, post-build, custom build steps) */
     buildEvents?: BuildEvent[];
     /** Configuration-specific settings (e.g., Debug/Release) */
     configurations?: Record<string, VcxprojConfigSettings>;
+}
+
+/**
+ * Reference to another project in the solution
+ */
+export interface ProjectReference {
+    /** Path to the referenced vcxproj file */
+    path: string;
+    /** Project GUID */
+    projectGuid?: string;
+    /** Project name (optional, inferred from path if not present) */
+    name?: string;
 }
 
 export interface VcxprojConfigSettings {
@@ -95,6 +133,10 @@ export interface VcxprojConfigSettings {
     runtimeTypeInfo?: boolean;
     treatWarningAsError?: boolean;
     multiProcessorCompilation?: boolean;
+    functionLevelLinking?: boolean;
+    intrinsicFunctions?: boolean;
+    wholeProgramOptimization?: boolean;
+    generateDebugInformation?: boolean | string;
 }
 
 /**
@@ -106,13 +148,16 @@ export interface VcxprojConfigSettings {
 export function parseVcxproj(content: string, projectPath: string): VcxprojProject {
     const contentWithoutConditionalItemDefinitionGroups = stripConditionalItemDefinitionGroups(content);
     const project: VcxprojProject = {
-        name: extractProjectName(projectPath),
+        name: extractProjectName(content, projectPath),
         type: 'Application',
         sourceFiles: [],
         headerFiles: [],
+        resourceFiles: [],
+        noneFiles: [],
         includeDirectories: [],
         preprocessorDefinitions: [],
-        libraries: []
+        libraries: [],
+        projectReferences: []
     };
 
     // Extract configuration type (Application, StaticLibrary, DynamicLibrary)
@@ -153,6 +198,35 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
             project.headerFiles.push(file);
         }
     }
+
+    // Extract resource files (ResourceCompile items) - .rc files
+    const resourceMatches = content.matchAll(/<ResourceCompile\s+Include="([^"]+)"\s*\/>/g);
+    for (const match of resourceMatches) {
+        project.resourceFiles.push(normalizePathSeparators(match[1]));
+    }
+    const resourceBlockMatches = content.matchAll(/<ResourceCompile\s+Include="([^"]+)"\s*>/g);
+    for (const match of resourceBlockMatches) {
+        const file = normalizePathSeparators(match[1]);
+        if (!project.resourceFiles.includes(file)) {
+            project.resourceFiles.push(file);
+        }
+    }
+
+    // Extract None items (files in the project but not compiled)
+    const noneMatches = content.matchAll(/<None\s+Include="([^"]+)"\s*\/>/g);
+    for (const match of noneMatches) {
+        project.noneFiles.push(normalizePathSeparators(match[1]));
+    }
+    const noneBlockMatches = content.matchAll(/<None\s+Include="([^"]+)"\s*>/g);
+    for (const match of noneBlockMatches) {
+        const file = normalizePathSeparators(match[1]);
+        if (!project.noneFiles.includes(file)) {
+            project.noneFiles.push(file);
+        }
+    }
+
+    // Extract project references
+    project.projectReferences = extractProjectReferences(content);
 
     // Extract include directories from AdditionalIncludeDirectories
     const includeDirs = extractIncludeDirectories(contentWithoutConditionalItemDefinitionGroups);
@@ -253,6 +327,74 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
         project.multiProcessorCompilation = mpValue;
     }
 
+    // Extract function-level linking
+    const fllMatch = contentWithoutConditionalItemDefinitionGroups.match(/<FunctionLevelLinking>(.*?)<\/FunctionLevelLinking>/);
+    const fllValue = fllMatch ? parseBooleanValue(fllMatch[1]) : undefined;
+    if (fllValue !== undefined) {
+        project.functionLevelLinking = fllValue;
+    }
+
+    // Extract intrinsic functions
+    const ifMatch = contentWithoutConditionalItemDefinitionGroups.match(/<IntrinsicFunctions>(.*?)<\/IntrinsicFunctions>/);
+    const ifValue = ifMatch ? parseBooleanValue(ifMatch[1]) : undefined;
+    if (ifValue !== undefined) {
+        project.intrinsicFunctions = ifValue;
+    }
+
+    // Extract whole program optimization
+    const wpoMatch = content.match(/<WholeProgramOptimization>(.*?)<\/WholeProgramOptimization>/);
+    const wpoValue = wpoMatch ? parseBooleanValue(wpoMatch[1]) : undefined;
+    if (wpoValue !== undefined) {
+        project.wholeProgramOptimization = wpoValue;
+    }
+
+    // Extract generate debug information
+    const genDebugMatch = contentWithoutConditionalItemDefinitionGroups.match(/<GenerateDebugInformation>(.*?)<\/GenerateDebugInformation>/);
+    if (genDebugMatch) {
+        const val = genDebugMatch[1].trim();
+        const boolVal = parseBooleanValue(val);
+        project.generateDebugInformation = boolVal !== undefined ? boolVal : val;
+    }
+
+    // Extract minimal rebuild
+    const minRebuildMatch = contentWithoutConditionalItemDefinitionGroups.match(/<MinimalRebuild>(.*?)<\/MinimalRebuild>/);
+    const minRebuildValue = minRebuildMatch ? parseBooleanValue(minRebuildMatch[1]) : undefined;
+    if (minRebuildValue !== undefined) {
+        project.minimalRebuild = minRebuildValue;
+    }
+
+    // Extract string pooling
+    const stringPoolMatch = contentWithoutConditionalItemDefinitionGroups.match(/<StringPooling>(.*?)<\/StringPooling>/);
+    const stringPoolValue = stringPoolMatch ? parseBooleanValue(stringPoolMatch[1]) : undefined;
+    if (stringPoolValue !== undefined) {
+        project.stringPooling = stringPoolValue;
+    }
+
+    // Extract conformance mode
+    const conformanceMatch = contentWithoutConditionalItemDefinitionGroups.match(/<ConformanceMode>(.*?)<\/ConformanceMode>/);
+    const conformanceValue = conformanceMatch ? parseBooleanValue(conformanceMatch[1]) : undefined;
+    if (conformanceValue !== undefined) {
+        project.conformanceMode = conformanceValue;
+    }
+
+    // Extract C language standard
+    const cStandardMatch = contentWithoutConditionalItemDefinitionGroups.match(/<LanguageStandard_C>(.*?)<\/LanguageStandard_C>/);
+    if (cStandardMatch) {
+        project.cStandard = parseCLanguageStandard(cStandardMatch[1]);
+    }
+
+    // Extract intermediate directory
+    const intDirMatch = content.match(/<IntDir>(.*?)<\/IntDir>/);
+    if (intDirMatch) {
+        project.intermediateDirectory = normalizePathSeparators(intDirMatch[1]);
+    }
+
+    // Extract target name
+    const targetNameMatch = content.match(/<TargetName>(.*?)<\/TargetName>/);
+    if (targetNameMatch) {
+        project.targetName = targetNameMatch[1];
+    }
+
     // Extract Windows SDK version
     const sdkVersionMatch = content.match(/<WindowsTargetPlatformVersion>(.*?)<\/WindowsTargetPlatformVersion>/);
     if (sdkVersionMatch) {
@@ -293,11 +435,26 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
 }
 
 /**
- * Extract project name from vcxproj file path
+ * Extract project name from vcxproj content or file path.
+ * Tries RootNamespace first, then ProjectName, then falls back to filename.
+ * @param content The XML content of the vcxproj file
  * @param projectPath Path to the vcxproj file
  * @returns Project name
  */
-function extractProjectName(projectPath: string): string {
+function extractProjectName(content: string, projectPath: string): string {
+    // Try RootNamespace first (common in VS projects)
+    const rootNamespaceMatch = content.match(/<RootNamespace>(.*?)<\/RootNamespace>/);
+    if (rootNamespaceMatch && rootNamespaceMatch[1].trim()) {
+        return rootNamespaceMatch[1].trim();
+    }
+
+    // Try ProjectName
+    const projectNameMatch = content.match(/<ProjectName>(.*?)<\/ProjectName>/);
+    if (projectNameMatch && projectNameMatch[1].trim()) {
+        return projectNameMatch[1].trim();
+    }
+
+    // Fall back to filename
     const match = projectPath.match(/([^/\\]+)\.vcxproj$/);
     return match ? match[1] : 'MyProject';
 }
@@ -465,6 +622,64 @@ function mergeUniqueStrings(existing: string[] | undefined, incoming: string[]):
     return merged;
 }
 
+/**
+ * Extract project references from vcxproj content
+ * @param content The XML content
+ * @returns List of project references
+ */
+function extractProjectReferences(content: string): ProjectReference[] {
+    const references: ProjectReference[] = [];
+    const refMatches = content.matchAll(/<ProjectReference\s+Include="([^"]+)"[^>]*>([\s\S]*?)<\/ProjectReference>/g);
+    for (const match of refMatches) {
+        const ref: ProjectReference = {
+            path: normalizePathSeparators(match[1]),
+        };
+        const guidMatch = match[2].match(/<Project>\{?([^}<]+)\}?<\/Project>/);
+        if (guidMatch) {
+            ref.projectGuid = guidMatch[1];
+        }
+        const nameMatch = match[2].match(/<Name>(.*?)<\/Name>/);
+        if (nameMatch) {
+            ref.name = nameMatch[1];
+        } else {
+            // Infer name from path
+            const pathNameMatch = ref.path.match(/([^/\\]+)\.vcxproj$/);
+            if (pathNameMatch) {
+                ref.name = pathNameMatch[1];
+            }
+        }
+        references.push(ref);
+    }
+    // Also handle self-closing ProjectReference tags
+    const selfClosingRefs = content.matchAll(/<ProjectReference\s+Include="([^"]+)"\s*\/>/g);
+    for (const match of selfClosingRefs) {
+        const path = normalizePathSeparators(match[1]);
+        if (!references.some(r => r.path === path)) {
+            const ref: ProjectReference = { path };
+            const pathNameMatch = path.match(/([^/\\]+)\.vcxproj$/);
+            if (pathNameMatch) {
+                ref.name = pathNameMatch[1];
+            }
+            references.push(ref);
+        }
+    }
+    return references;
+}
+
+/**
+ * Parse Visual Studio C language standard to numeric version
+ * @param languageStandard The LanguageStandard_C value from vcxproj (e.g., "stdc11", "stdc17")
+ * @returns Numeric C standard version or undefined
+ */
+function parseCLanguageStandard(languageStandard: string): number | undefined {
+    const standardMap: Record<string, number> = {
+        'stdc11': 11,
+        'stdc17': 17,
+        'stdclatest': 17  // Map 'latest' to C17 as a reasonable default
+    };
+    return standardMap[languageStandard.toLowerCase()];
+}
+
 function parseConfigurationSettings(content: string): Record<string, VcxprojConfigSettings> {
     const configMap: Record<string, VcxprojConfigSettings> = {};
     const conditionalGroups = content.matchAll(/<ItemDefinitionGroup\s+Condition="([^"]+)"[^>]*>([\s\S]*?)<\/ItemDefinitionGroup>/g);
@@ -551,6 +766,31 @@ function parseConfigurationSettings(content: string): Record<string, VcxprojConf
             settings.multiProcessorCompilation = mpValue;
         }
 
+        const fllMatch = blockContent.match(/<FunctionLevelLinking>(.*?)<\/FunctionLevelLinking>/);
+        const fllValue = fllMatch ? parseBooleanValue(fllMatch[1]) : undefined;
+        if (fllValue !== undefined) {
+            settings.functionLevelLinking = fllValue;
+        }
+
+        const ifMatch = blockContent.match(/<IntrinsicFunctions>(.*?)<\/IntrinsicFunctions>/);
+        const ifValue = ifMatch ? parseBooleanValue(ifMatch[1]) : undefined;
+        if (ifValue !== undefined) {
+            settings.intrinsicFunctions = ifValue;
+        }
+
+        const wpoMatch = blockContent.match(/<WholeProgramOptimization>(.*?)<\/WholeProgramOptimization>/);
+        const wpoValue = wpoMatch ? parseBooleanValue(wpoMatch[1]) : undefined;
+        if (wpoValue !== undefined) {
+            settings.wholeProgramOptimization = wpoValue;
+        }
+
+        const genDebugMatch = blockContent.match(/<GenerateDebugInformation>(.*?)<\/GenerateDebugInformation>/);
+        if (genDebugMatch) {
+            const val = genDebugMatch[1].trim();
+            const boolVal = parseBooleanValue(val);
+            settings.generateDebugInformation = boolVal !== undefined ? boolVal : val;
+        }
+
         if (Object.keys(settings).length > 0) {
             const existing = configMap[configName];
             configMap[configName] = existing ? mergeConfigSettings(existing, settings) : settings;
@@ -589,7 +829,11 @@ function mergeConfigSettings(base: VcxprojConfigSettings, incoming: VcxprojConfi
         exceptionHandling: incoming.exceptionHandling ?? base.exceptionHandling,
         runtimeTypeInfo: incoming.runtimeTypeInfo ?? base.runtimeTypeInfo,
         treatWarningAsError: incoming.treatWarningAsError ?? base.treatWarningAsError,
-        multiProcessorCompilation: incoming.multiProcessorCompilation ?? base.multiProcessorCompilation
+        multiProcessorCompilation: incoming.multiProcessorCompilation ?? base.multiProcessorCompilation,
+        functionLevelLinking: incoming.functionLevelLinking ?? base.functionLevelLinking,
+        intrinsicFunctions: incoming.intrinsicFunctions ?? base.intrinsicFunctions,
+        wholeProgramOptimization: incoming.wholeProgramOptimization ?? base.wholeProgramOptimization,
+        generateDebugInformation: incoming.generateDebugInformation ?? base.generateDebugInformation
     };
 }
 
@@ -691,75 +935,94 @@ function parsePchConfig(content: string): PchConfig | undefined {
 function parseBuildEvents(content: string): BuildEvent[] | undefined {
     const buildEvents: BuildEvent[] = [];
 
-    // Extract PreBuildEvent
-    const preBuildMatch = content.match(/<PreBuildEvent>([\s\S]*?)<\/PreBuildEvent>/);
-    if (preBuildMatch) {
-        const preBuildContent = preBuildMatch[1];
-        const commandMatch = preBuildContent.match(/<Command>(.*?)<\/Command>/);
-        const messageMatch = preBuildContent.match(/<Message>(.*?)<\/Message>/);
-        
-        if (commandMatch && commandMatch[1].trim()) {
-            buildEvents.push({
-                type: 'PreBuild',
-                command: commandMatch[1].trim(),
-                message: messageMatch ? messageMatch[1].trim() : undefined
-            });
+    // Helper to extract command text (handles both single-line and multi-line CDATA or plain text)
+    const extractCommand = (eventContent: string): string | undefined => {
+        // Try single-line first
+        const singleLineMatch = eventContent.match(/<Command>(.*?)<\/Command>/);
+        if (singleLineMatch && singleLineMatch[1].trim()) {
+            return decodeXmlEntities(singleLineMatch[1].trim());
+        }
+        // Try multi-line
+        const multiLineMatch = eventContent.match(/<Command>([\s\S]*?)<\/Command>/);
+        if (multiLineMatch && multiLineMatch[1].trim()) {
+            return decodeXmlEntities(multiLineMatch[1].trim());
+        }
+        return undefined;
+    };
+
+    const extractMessage = (eventContent: string): string | undefined => {
+        const match = eventContent.match(/<Message>([\s\S]*?)<\/Message>/);
+        return match ? decodeXmlEntities(match[1].trim()) : undefined;
+    };
+
+    // Extract PreBuildEvent (handle multiple occurrences across configurations)
+    const preBuildMatches = content.matchAll(/<PreBuildEvent>([\s\S]*?)<\/PreBuildEvent>/g);
+    for (const preBuildMatch of preBuildMatches) {
+        const command = extractCommand(preBuildMatch[1]);
+        const message = extractMessage(preBuildMatch[1]);
+        if (command) {
+            if (!buildEvents.some(e => e.type === 'PreBuild' && e.command === command)) {
+                buildEvents.push({ type: 'PreBuild', command, message });
+            }
         }
     }
 
     // Extract PreLinkEvent
-    const preLinkMatch = content.match(/<PreLinkEvent>([\s\S]*?)<\/PreLinkEvent>/);
-    if (preLinkMatch) {
-        const preLinkContent = preLinkMatch[1];
-        const commandMatch = preLinkContent.match(/<Command>(.*?)<\/Command>/);
-        const messageMatch = preLinkContent.match(/<Message>(.*?)<\/Message>/);
-        
-        if (commandMatch && commandMatch[1].trim()) {
-            buildEvents.push({
-                type: 'PreLink',
-                command: commandMatch[1].trim(),
-                message: messageMatch ? messageMatch[1].trim() : undefined
-            });
+    const preLinkMatches = content.matchAll(/<PreLinkEvent>([\s\S]*?)<\/PreLinkEvent>/g);
+    for (const preLinkMatch of preLinkMatches) {
+        const command = extractCommand(preLinkMatch[1]);
+        const message = extractMessage(preLinkMatch[1]);
+        if (command) {
+            if (!buildEvents.some(e => e.type === 'PreLink' && e.command === command)) {
+                buildEvents.push({ type: 'PreLink', command, message });
+            }
         }
     }
 
     // Extract PostBuildEvent
-    const postBuildMatch = content.match(/<PostBuildEvent>([\s\S]*?)<\/PostBuildEvent>/);
-    if (postBuildMatch) {
-        const postBuildContent = postBuildMatch[1];
-        const commandMatch = postBuildContent.match(/<Command>(.*?)<\/Command>/);
-        const messageMatch = postBuildContent.match(/<Message>(.*?)<\/Message>/);
-        
-        if (commandMatch && commandMatch[1].trim()) {
-            buildEvents.push({
-                type: 'PostBuild',
-                command: commandMatch[1].trim(),
-                message: messageMatch ? messageMatch[1].trim() : undefined
-            });
+    const postBuildMatches = content.matchAll(/<PostBuildEvent>([\s\S]*?)<\/PostBuildEvent>/g);
+    for (const postBuildMatch of postBuildMatches) {
+        const command = extractCommand(postBuildMatch[1]);
+        const message = extractMessage(postBuildMatch[1]);
+        if (command) {
+            if (!buildEvents.some(e => e.type === 'PostBuild' && e.command === command)) {
+                buildEvents.push({ type: 'PostBuild', command, message });
+            }
         }
     }
 
     // Extract CustomBuildStep
-    const customBuildMatch = content.match(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/);
-    if (customBuildMatch) {
-        const customBuildContent = customBuildMatch[1];
-        const commandMatch = customBuildContent.match(/<Command>(.*?)<\/Command>/);
-        const messageMatch = customBuildContent.match(/<Message>(.*?)<\/Message>/);
-        const outputsMatch = customBuildContent.match(/<Outputs>(.*?)<\/Outputs>/);
-        
-        if (commandMatch && commandMatch[1].trim()) {
-            const outputs = outputsMatch 
+    const customBuildMatches = content.matchAll(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/g);
+    for (const customBuildMatch of customBuildMatches) {
+        const command = extractCommand(customBuildMatch[1]);
+        const message = extractMessage(customBuildMatch[1]);
+        const outputsMatch = customBuildMatch[1].match(/<Outputs>(.*?)<\/Outputs>/);
+        if (command) {
+            const outputs = outputsMatch
                 ? outputsMatch[1].split(';').map(o => o.trim()).filter(o => o)
                 : undefined;
-                
-            buildEvents.push({
-                type: 'CustomBuild',
-                command: commandMatch[1].trim(),
-                message: messageMatch ? messageMatch[1].trim() : undefined,
-                outputs: outputs
-            });
+            if (!buildEvents.some(e => e.type === 'CustomBuild' && e.command === command)) {
+                buildEvents.push({ type: 'CustomBuild', command, message, outputs });
+            }
         }
     }
 
     return buildEvents.length > 0 ? buildEvents : undefined;
+}
+
+/**
+ * Decode common XML entities
+ */
+function decodeXmlEntities(text: string): string {
+    return text
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&#xD;&#xA;/g, '\n')
+        .replace(/&#xD;/g, '\r')
+        .replace(/&#xA;/g, '\n')
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
 }

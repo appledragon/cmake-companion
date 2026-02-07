@@ -9,16 +9,27 @@ import * as assert from 'assert';
 
 describe('CMake Generator', () => {
     describe('generateCMakeLists', () => {
-        it('should generate CMakeLists for a simple application', () => {
-            const project: VcxprojProject = {
+        function makeVcxProject(overrides?: Partial<VcxprojProject>): VcxprojProject {
+            return {
                 name: 'MyApp',
                 type: 'Application',
-                sourceFiles: ['main.cpp', 'utils.cpp'],
-                headerFiles: ['utils.h'],
+                sourceFiles: ['main.cpp'],
+                headerFiles: [],
+                resourceFiles: [],
+                noneFiles: [],
                 includeDirectories: [],
                 preprocessorDefinitions: [],
-                libraries: []
+                libraries: [],
+                projectReferences: [],
+                ...overrides
             };
+        }
+
+        it('should generate CMakeLists for a simple application', () => {
+            const project = makeVcxProject({
+                sourceFiles: ['main.cpp', 'utils.cpp'],
+                headerFiles: ['utils.h'],
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -31,15 +42,12 @@ describe('CMake Generator', () => {
         });
 
         it('should generate CMakeLists for a static library', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'MyLib',
                 type: 'StaticLibrary',
                 sourceFiles: ['lib.cpp'],
                 headerFiles: ['lib.h'],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -49,15 +57,12 @@ describe('CMake Generator', () => {
         });
 
         it('should generate CMakeLists for a dynamic library', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'MyDll',
                 type: 'DynamicLibrary',
                 sourceFiles: ['dll.cpp'],
                 headerFiles: ['dll.h'],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -65,15 +70,9 @@ describe('CMake Generator', () => {
         });
 
         it('should include directories', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
+            const project = makeVcxProject({
                 includeDirectories: ['include', '../external/include'],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -83,15 +82,9 @@ describe('CMake Generator', () => {
         });
 
         it('should include preprocessor definitions', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
+            const project = makeVcxProject({
                 preprocessorDefinitions: ['WIN32', '_DEBUG', '_CONSOLE'],
-                libraries: []
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -102,15 +95,9 @@ describe('CMake Generator', () => {
         });
 
         it('should include libraries', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
+            const project = makeVcxProject({
                 libraries: ['opengl32', 'glu32']
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -120,15 +107,7 @@ describe('CMake Generator', () => {
         });
 
         it('should set C++ standard', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            const project = makeVcxProject();
 
             const cmake = generateCMakeLists(project);
             
@@ -137,15 +116,10 @@ describe('CMake Generator', () => {
         });
 
         it('should handle project with no files', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'EmptyApp',
-                type: 'Application',
                 sourceFiles: [],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -153,15 +127,14 @@ describe('CMake Generator', () => {
         });
 
         it('should generate complete CMakeLists with all features', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'CompleteApp',
-                type: 'Application',
                 sourceFiles: ['main.cpp', 'utils.cpp'],
                 headerFiles: ['utils.h', 'config.h'],
                 includeDirectories: ['include', '../external/include'],
                 preprocessorDefinitions: ['WIN32', '_DEBUG'],
                 libraries: ['opengl32', 'user32']
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -189,16 +162,9 @@ describe('CMake Generator', () => {
         });
 
         it('should use parsed C++ standard (14)', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 cxxStandard: 14
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -206,16 +172,9 @@ describe('CMake Generator', () => {
         });
 
         it('should use parsed C++ standard (20)', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 cxxStandard: 20
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -223,16 +182,9 @@ describe('CMake Generator', () => {
         });
 
         it('should include Windows SDK version', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 windowsSdkVersion: '10.0.19041.0'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -240,16 +192,9 @@ describe('CMake Generator', () => {
         });
 
         it('should include platform toolset as comment', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 platformToolset: 'v142'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -257,16 +202,9 @@ describe('CMake Generator', () => {
         });
 
         it('should add Unicode definitions for Unicode character set', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 characterSet: 'Unicode'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -274,16 +212,9 @@ describe('CMake Generator', () => {
         });
 
         it('should add MBCS definition for MultiByte character set', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 characterSet: 'MultiByte'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -291,16 +222,9 @@ describe('CMake Generator', () => {
         });
 
         it('should set WIN32_EXECUTABLE for Windows subsystem', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 subsystem: 'Windows'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -308,16 +232,9 @@ describe('CMake Generator', () => {
         });
 
         it('should handle Console subsystem with a comment', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 subsystem: 'Console'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -325,10 +242,8 @@ describe('CMake Generator', () => {
         });
 
         it('should generate complete CMakeLists with all extended properties', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'FullApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
                 headerFiles: ['header.h'],
                 includeDirectories: ['include'],
                 preprocessorDefinitions: ['DEBUG'],
@@ -338,7 +253,7 @@ describe('CMake Generator', () => {
                 platformToolset: 'v143',
                 characterSet: 'Unicode',
                 subsystem: 'Windows'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -351,14 +266,8 @@ describe('CMake Generator', () => {
         });
 
         it('should generate compiler and linker options', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'OptionsApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
                 warningLevel: 4,
                 optimization: 'MaxSpeed',
                 debugInformationFormat: 'ProgramDatabase',
@@ -370,7 +279,7 @@ describe('CMake Generator', () => {
                 additionalLinkOptions: ['/INCREMENTAL:NO'],
                 additionalLibraryDirectories: ['lib'],
                 runtimeLibrary: 'MultiThreadedDebugDLL'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
 
@@ -393,14 +302,8 @@ describe('CMake Generator', () => {
         });
 
         it('should generate configuration-specific settings', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'ConfigApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
                 configurations: {
                     Debug: {
                         includeDirectories: ['debug/include'],
@@ -423,7 +326,7 @@ describe('CMake Generator', () => {
                         runtimeLibrary: 'MultiThreadedDLL'
                     }
                 }
-            };
+            });
 
             const cmake = generateCMakeLists(project);
 
@@ -459,21 +362,16 @@ describe('CMake Generator', () => {
         });
 
         it('should generate precompiled headers configuration', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
+            const project = makeVcxProject({
                 sourceFiles: ['main.cpp', 'pch.cpp'],
                 headerFiles: ['pch.h'],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
                 pchConfig: {
                     enabled: true,
                     headerFile: 'pch.h',
                     sourceFile: 'pch.cpp',
                     excludedFiles: []
                 }
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -483,21 +381,16 @@ describe('CMake Generator', () => {
         });
 
         it('should generate precompiled headers with excluded files', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
+            const project = makeVcxProject({
                 sourceFiles: ['main.cpp', 'pch.cpp', 'external/lib.cpp'],
                 headerFiles: ['pch.h'],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
                 pchConfig: {
                     enabled: true,
                     headerFile: 'pch.h',
                     sourceFile: 'pch.cpp',
                     excludedFiles: ['external/lib.cpp', 'generated/code.cpp']
                 }
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -510,15 +403,7 @@ describe('CMake Generator', () => {
         });
 
         it('should not generate PCH configuration when not enabled', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: []
-            };
+            const project = makeVcxProject();
 
             const cmake = generateCMakeLists(project);
             
@@ -528,19 +413,12 @@ describe('CMake Generator', () => {
         });
 
         it('should not generate PCH without header file', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 pchConfig: {
                     enabled: true,
                     excludedFiles: []
                 }
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             
@@ -548,19 +426,12 @@ describe('CMake Generator', () => {
         });
 
         it('should handle build events', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 buildEvents: [
                     { type: 'PreBuild', command: 'echo Building...', message: 'Pre-build step' },
                     { type: 'PostBuild', command: 'copy output.exe ../bin/', message: 'Post-build step' }
                 ]
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('PRE_BUILD') || cmake.includes('POST_BUILD'), 'Should include build event');
@@ -568,144 +439,81 @@ describe('CMake Generator', () => {
         });
 
         it('should handle optimization Disabled', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 optimization: 'Disabled'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/Od'));
         });
 
         it('should handle optimization MinSpace', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 optimization: 'MinSpace'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/O1'));
         });
 
         it('should handle optimization Full', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 optimization: 'Full'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/Ox'));
         });
 
         it('should handle debugInformationFormat EditAndContinue', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 debugInformationFormat: 'EditAndContinue'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/ZI'));
         });
 
         it('should handle debugInformationFormat OldStyle', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 debugInformationFormat: 'OldStyle'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/Z7'));
         });
 
         it('should handle exceptionHandling Async', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 exceptionHandling: 'Async'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/EHa'));
         });
 
         it('should handle exceptionHandling SyncCThrow', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 exceptionHandling: 'SyncCThrow'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/EHs'));
         });
 
         it('should handle runtimeTypeInfo false', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 runtimeTypeInfo: false
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('/GR-'));
         });
 
         it('should handle unknown optimization gracefully', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 optimization: 'UnknownLevel'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             // Should not crash, just skip the unknown optimization
@@ -714,16 +522,9 @@ describe('CMake Generator', () => {
         });
 
         it('should handle unknown debug info format gracefully', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 debugInformationFormat: 'UnknownFormat'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('project(MyApp)'));
@@ -731,16 +532,9 @@ describe('CMake Generator', () => {
         });
 
         it('should handle unknown exception handling gracefully', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 exceptionHandling: 'UnknownMode'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('project(MyApp)'));
@@ -748,21 +542,15 @@ describe('CMake Generator', () => {
         });
 
         it('should handle config-specific link options and library directories', () => {
-            const project: VcxprojProject = {
+            const project = makeVcxProject({
                 name: 'ConfigApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
                 configurations: {
                     Debug: {
                         additionalLinkOptions: ['/DEBUG:FULL'],
                         additionalLibraryDirectories: ['debug/lib']
                     }
                 }
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             assert.ok(cmake.includes('Linker options (Debug)'));
@@ -770,16 +558,9 @@ describe('CMake Generator', () => {
         });
 
         it('should handle output directory property (no-op in cmake)', () => {
-            const project: VcxprojProject = {
-                name: 'MyApp',
-                type: 'Application',
-                sourceFiles: ['main.cpp'],
-                headerFiles: [],
-                includeDirectories: [],
-                preprocessorDefinitions: [],
-                libraries: [],
+            const project = makeVcxProject({
                 outputDirectory: 'bin/Release'
-            };
+            });
 
             const cmake = generateCMakeLists(project);
             // outputDirectory is not directly used in cmake generation
@@ -794,6 +575,7 @@ describe('CMake Generator', () => {
                 type: 'Application',
                 sourceFiles: ['main.cpp'],
                 headerFiles: [],
+                resourceFiles: [],
                 includeDirectories: [],
                 preprocessorDefinitions: [],
                 libraries: [],

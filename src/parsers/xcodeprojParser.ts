@@ -33,9 +33,11 @@ export interface ShellScriptPhase {
 
 export interface XcodeprojProject {
     name: string;
-    type: 'Application' | 'StaticLibrary' | 'DynamicLibrary';
+    type: 'Application' | 'StaticLibrary' | 'DynamicLibrary' | 'Framework' | 'Bundle';
     sourceFiles: string[];
     headerFiles: string[];
+    /** Resource files (images, xibs, storyboards, etc.) */
+    resourceFiles: string[];
     includeDirectories: string[];
     preprocessorDefinitions: string[];
     libraries: string[];
@@ -46,16 +48,48 @@ export interface XcodeprojProject {
     additionalLinkOptions?: string[];
     /** Additional library search paths */
     additionalLibraryDirectories?: string[];
+    /** Framework search paths */
+    frameworkSearchPaths?: string[];
     /** C++ language standard (e.g., 11, 14, 17, 20, 23) */
     cxxStandard?: number;
+    /** C language standard */
+    cStandard?: number;
     /** Deployment target (e.g., "10.15" for macOS) */
     deploymentTarget?: string;
+    /** iOS deployment target */
+    iosDeploymentTarget?: string;
     /** Architecture (e.g., "arm64", "x86_64", "$(ARCHS_STANDARD)") */
     architecture?: string;
+    /** Product name (bundle/app display name) */
+    productName?: string;
+    /** Bundle identifier */
+    bundleIdentifier?: string;
+    /** Info.plist file path */
+    infoPlistFile?: string;
+    /** Enable modules (clang modules, @import) */
+    enableModules?: boolean;
+    /** Enable ARC (Automatic Reference Counting) for Objective-C */
+    enableARC?: boolean;
     /** Shell script build phases (Run Script phases) */
     shellScriptPhases?: ShellScriptPhase[];
+    /** Copy files build phases */
+    copyFilesPhases?: CopyFilesPhase[];
     /** Configuration-specific settings (e.g., Debug/Release) */
     configurations?: Record<string, XcodeprojConfigSettings>;
+}
+
+/**
+ * Copy files build phase
+ */
+export interface CopyFilesPhase {
+    /** Name of the copy files phase */
+    name?: string;
+    /** Destination subfolder spec */
+    dstSubfolderSpec?: number;
+    /** Destination path */
+    dstPath?: string;
+    /** Files to copy */
+    files: string[];
 }
 
 export interface XcodeprojConfigSettings {
@@ -66,6 +100,9 @@ export interface XcodeprojConfigSettings {
     additionalCompileOptions?: string[];
     additionalLinkOptions?: string[];
     additionalLibraryDirectories?: string[];
+    frameworkSearchPaths?: string[];
+    optimization?: string;
+    debugInformationFormat?: string;
 }
 
 /**
@@ -80,6 +117,7 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
         type: 'Application',
         sourceFiles: [],
         headerFiles: [],
+        resourceFiles: [],
         includeDirectories: [],
         preprocessorDefinitions: [],
         libraries: [],
@@ -138,16 +176,68 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                 }
             }
 
+            // Check if this is a headers build phase
+            if (phase.includes('PBXHeadersBuildPhase')) {
+                const files = extractBuildPhaseFiles(phase, objects);
+                for (const file of files) {
+                    if (isHeaderFile(file) && !project.headerFiles.includes(file)) {
+                        project.headerFiles.push(file);
+                    }
+                }
+            }
+
             // Check if this is a frameworks build phase
             if (phase.includes('PBXFrameworksBuildPhase')) {
                 const frameworks = extractBuildPhaseFiles(phase, objects);
-                for (const framework of frameworks) {
-                    if (framework.endsWith('.framework')) {
-                        const frameworkName = framework.replace(/\.framework$/, '');
-                        project.frameworks.push(frameworkName);
+                for (const frameworkPath of frameworks) {
+                    // Extract just the filename (basename) from the path
+                    const basename = getBasename(frameworkPath);
+                    if (basename.endsWith('.framework')) {
+                        const frameworkName = basename.replace(/\.framework$/, '');
+                        if (!project.frameworks.includes(frameworkName)) {
+                            project.frameworks.push(frameworkName);
+                        }
+                    } else if (basename.endsWith('.tbd')) {
+                        const libName = basename.replace(/^lib/, '').replace(/\.tbd$/, '');
+                        if (!project.libraries.includes(libName)) {
+                            project.libraries.push(libName);
+                        }
+                    } else if (basename.endsWith('.dylib')) {
+                        const libName = basename.replace(/^lib/, '').replace(/\.dylib$/, '');
+                        if (!project.libraries.includes(libName)) {
+                            project.libraries.push(libName);
+                        }
+                    } else if (basename.endsWith('.a')) {
+                        const libName = basename.replace(/^lib/, '').replace(/\.a$/, '');
+                        if (!project.libraries.includes(libName)) {
+                            project.libraries.push(libName);
+                        }
                     } else {
-                        project.libraries.push(framework);
+                        if (!project.libraries.includes(basename)) {
+                            project.libraries.push(basename);
+                        }
                     }
+                }
+            }
+
+            // Check if this is a resources build phase
+            if (phase.includes('PBXResourcesBuildPhase')) {
+                const resources = extractBuildPhaseFiles(phase, objects);
+                for (const resource of resources) {
+                    if (!project.resourceFiles.includes(resource)) {
+                        project.resourceFiles.push(resource);
+                    }
+                }
+            }
+
+            // Check if this is a copy files build phase
+            if (phase.includes('PBXCopyFilesBuildPhase')) {
+                if (!project.copyFilesPhases) {
+                    project.copyFilesPhases = [];
+                }
+                const copyPhase = parseCopyFilesPhase(phase, objects);
+                if (copyPhase) {
+                    project.copyFilesPhases.push(copyPhase);
                 }
             }
 
@@ -194,11 +284,32 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                     if (!project.cxxStandard && settings.cxxStandard) {
                         project.cxxStandard = settings.cxxStandard;
                     }
+                    if (!project.cStandard && settings.cStandard) {
+                        project.cStandard = settings.cStandard;
+                    }
                     if (!project.deploymentTarget && settings.deploymentTarget) {
                         project.deploymentTarget = settings.deploymentTarget;
                     }
+                    if (!project.iosDeploymentTarget && settings.iosDeploymentTarget) {
+                        project.iosDeploymentTarget = settings.iosDeploymentTarget;
+                    }
                     if (!project.architecture && settings.architecture) {
                         project.architecture = settings.architecture;
+                    }
+                    if (!project.productName && settings.productName) {
+                        project.productName = settings.productName;
+                    }
+                    if (!project.bundleIdentifier && settings.bundleIdentifier) {
+                        project.bundleIdentifier = settings.bundleIdentifier;
+                    }
+                    if (!project.infoPlistFile && settings.infoPlistFile) {
+                        project.infoPlistFile = settings.infoPlistFile;
+                    }
+                    if (project.enableModules === undefined && settings.enableModules !== undefined) {
+                        project.enableModules = settings.enableModules;
+                    }
+                    if (project.enableARC === undefined && settings.enableARC !== undefined) {
+                        project.enableARC = settings.enableARC;
                     }
 
                     // Store config-specific settings
@@ -207,7 +318,10 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                         preprocessorDefinitions: settings.preprocessorDefinitions,
                         additionalCompileOptions: settings.additionalCompileOptions,
                         additionalLinkOptions: settings.additionalLinkOptions,
-                        additionalLibraryDirectories: settings.additionalLibraryDirectories
+                        additionalLibraryDirectories: settings.additionalLibraryDirectories,
+                        frameworkSearchPaths: settings.frameworkSearchPaths,
+                        optimization: settings.optimization,
+                        debugInformationFormat: settings.debugInformationFormat
                     };
 
                     // Merge common settings
@@ -217,6 +331,31 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                     if (settings.preprocessorDefinitions) {
                         project.preprocessorDefinitions = mergeUnique(project.preprocessorDefinitions, settings.preprocessorDefinitions);
                     }
+                    if (settings.frameworkSearchPaths) {
+                        project.frameworkSearchPaths = mergeUnique(project.frameworkSearchPaths ?? [], settings.frameworkSearchPaths);
+                    }
+                    if (settings.additionalCompileOptions) {
+                        project.additionalCompileOptions = mergeUnique(project.additionalCompileOptions ?? [], settings.additionalCompileOptions);
+                    }
+                    if (settings.additionalLinkOptions) {
+                        project.additionalLinkOptions = mergeUnique(project.additionalLinkOptions ?? [], settings.additionalLinkOptions);
+                    }
+                    if (settings.additionalLibraryDirectories) {
+                        project.additionalLibraryDirectories = mergeUnique(project.additionalLibraryDirectories ?? [], settings.additionalLibraryDirectories);
+                    }
+                }
+            }
+        }
+    }
+
+    // Also scan PBXFileReference entries for header files not part of any build phase
+    for (const [, definition] of Object.entries(objects)) {
+        if (definition.includes('isa = PBXFileReference')) {
+            const pathMatch = definition.match(/path\s*=\s*([^;]+);/);
+            if (pathMatch) {
+                const filePath = unquoteString(pathMatch[1].trim());
+                if (isHeaderFile(filePath) && !project.headerFiles.includes(filePath)) {
+                    project.headerFiles.push(filePath);
                 }
             }
         }
@@ -332,7 +471,7 @@ function findFirstNativeTarget(objects: Record<string, string>): string | undefi
  * @param productType The Xcode product type string
  * @returns Our normalized project type
  */
-function mapProductType(productType: string): 'Application' | 'StaticLibrary' | 'DynamicLibrary' {
+function mapProductType(productType: string): 'Application' | 'StaticLibrary' | 'DynamicLibrary' | 'Framework' | 'Bundle' {
     // Xcode product types use reverse-domain notation
     // e.g., com.apple.product-type.application, com.apple.product-type.library.static
     if (productType.includes('application') || productType.includes('tool')) {
@@ -341,6 +480,10 @@ function mapProductType(productType: string): 'Application' | 'StaticLibrary' | 
         return 'StaticLibrary';
     } else if (productType.includes('library.dynamic') || productType.includes('dylib')) {
         return 'DynamicLibrary';
+    } else if (productType.includes('framework')) {
+        return 'Framework';
+    } else if (productType.includes('bundle')) {
+        return 'Bundle';
     }
     return 'Application';
 }
@@ -418,6 +561,16 @@ function unquoteString(str: string): string {
 }
 
 /**
+ * Get the basename (last path component) from a file path
+ * @param filePath The file path
+ * @returns The basename
+ */
+function getBasename(filePath: string): string {
+    const parts = filePath.split('/');
+    return parts[parts.length - 1];
+}
+
+/**
  * Check if a file is a source file
  * @param filename The filename
  * @returns True if it's a source file
@@ -442,13 +595,23 @@ function isHeaderFile(filename: string): boolean {
  */
 function extractBuildSettings(config: string): {
     cxxStandard?: number;
+    cStandard?: number;
     deploymentTarget?: string;
+    iosDeploymentTarget?: string;
     architecture?: string;
     includeDirectories?: string[];
     preprocessorDefinitions?: string[];
     additionalCompileOptions?: string[];
     additionalLinkOptions?: string[];
     additionalLibraryDirectories?: string[];
+    frameworkSearchPaths?: string[];
+    productName?: string;
+    bundleIdentifier?: string;
+    infoPlistFile?: string;
+    enableModules?: boolean;
+    enableARC?: boolean;
+    optimization?: string;
+    debugInformationFormat?: string;
 } {
     const settings: ReturnType<typeof extractBuildSettings> = {};
 
@@ -466,10 +629,22 @@ function extractBuildSettings(config: string): {
         settings.cxxStandard = parseCxxStandard(cxxStandardMatch[1].trim());
     }
 
-    // Extract deployment target
+    // Extract C standard (GCC_C_LANGUAGE_STANDARD)
+    const cStandardMatch = buildSettingsContent.match(/GCC_C_LANGUAGE_STANDARD\s*=\s*"?([^";]+)"?;/);
+    if (cStandardMatch) {
+        settings.cStandard = parseCStandard(cStandardMatch[1].trim());
+    }
+
+    // Extract deployment target (macOS)
     const deploymentTargetMatch = buildSettingsContent.match(/MACOSX_DEPLOYMENT_TARGET\s*=\s*([^;]+);/);
     if (deploymentTargetMatch) {
         settings.deploymentTarget = unquoteString(deploymentTargetMatch[1].trim());
+    }
+
+    // Extract deployment target (iOS)
+    const iosDeploymentTargetMatch = buildSettingsContent.match(/IPHONEOS_DEPLOYMENT_TARGET\s*=\s*([^;]+);/);
+    if (iosDeploymentTargetMatch) {
+        settings.iosDeploymentTarget = unquoteString(iosDeploymentTargetMatch[1].trim());
     }
 
     // Extract architecture
@@ -478,35 +653,66 @@ function extractBuildSettings(config: string): {
         settings.architecture = unquoteString(archMatch[1].trim());
     }
 
-    // Extract header search paths (HEADER_SEARCH_PATHS)
-    const headerSearchMatch = buildSettingsContent.match(/HEADER_SEARCH_PATHS\s*=\s*\(([\s\S]*?)\);/);
-    if (headerSearchMatch) {
-        settings.includeDirectories = extractListItems(headerSearchMatch[1]);
+    // Extract product name
+    const productNameMatch = buildSettingsContent.match(/PRODUCT_NAME\s*=\s*"?([^";]+)"?;/);
+    if (productNameMatch) {
+        settings.productName = unquoteString(productNameMatch[1].trim());
     }
 
-    // Extract preprocessor definitions (GCC_PREPROCESSOR_DEFINITIONS)
-    const preprocessorMatch = buildSettingsContent.match(/GCC_PREPROCESSOR_DEFINITIONS\s*=\s*\(([\s\S]*?)\);/);
-    if (preprocessorMatch) {
-        settings.preprocessorDefinitions = extractListItems(preprocessorMatch[1]);
+    // Extract bundle identifier
+    const bundleIdMatch = buildSettingsContent.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";]+)"?;/);
+    if (bundleIdMatch) {
+        settings.bundleIdentifier = unquoteString(bundleIdMatch[1].trim());
     }
+
+    // Extract Info.plist file
+    const infoPlistMatch = buildSettingsContent.match(/INFOPLIST_FILE\s*=\s*"?([^";]+)"?;/);
+    if (infoPlistMatch) {
+        settings.infoPlistFile = unquoteString(infoPlistMatch[1].trim());
+    }
+
+    // Extract enable modules
+    const enableModulesMatch = buildSettingsContent.match(/CLANG_ENABLE_MODULES\s*=\s*([^;]+);/);
+    if (enableModulesMatch) {
+        settings.enableModules = enableModulesMatch[1].trim() === 'YES';
+    }
+
+    // Extract ARC
+    const enableARCMatch = buildSettingsContent.match(/CLANG_ENABLE_OBJC_ARC\s*=\s*([^;]+);/);
+    if (enableARCMatch) {
+        settings.enableARC = enableARCMatch[1].trim() === 'YES';
+    }
+
+    // Extract optimization level (GCC_OPTIMIZATION_LEVEL)
+    const optimizationMatch = buildSettingsContent.match(/GCC_OPTIMIZATION_LEVEL\s*=\s*"?([^";]+)"?;/);
+    if (optimizationMatch) {
+        settings.optimization = optimizationMatch[1].trim();
+    }
+
+    // Extract debug information format
+    const debugInfoMatch = buildSettingsContent.match(/DEBUG_INFORMATION_FORMAT\s*=\s*"?([^";]+)"?;/);
+    if (debugInfoMatch) {
+        settings.debugInformationFormat = debugInfoMatch[1].trim();
+    }
+
+    // Extract header search paths (HEADER_SEARCH_PATHS) - handle both list and single value
+    settings.includeDirectories = extractBuildSettingListOrSingle(buildSettingsContent, 'HEADER_SEARCH_PATHS');
+
+    // Extract preprocessor definitions (GCC_PREPROCESSOR_DEFINITIONS) - handle both list and single value
+    settings.preprocessorDefinitions = extractBuildSettingListOrSingle(buildSettingsContent, 'GCC_PREPROCESSOR_DEFINITIONS');
 
     // Extract other compiler flags (OTHER_CFLAGS, OTHER_CPLUSPLUSFLAGS)
-    const otherCflagsMatch = buildSettingsContent.match(/OTHER_CPLUSPLUSFLAGS\s*=\s*\(([\s\S]*?)\);/);
-    if (otherCflagsMatch) {
-        settings.additionalCompileOptions = extractListItems(otherCflagsMatch[1]);
-    }
+    settings.additionalCompileOptions = extractBuildSettingListOrSingle(buildSettingsContent, 'OTHER_CPLUSPLUSFLAGS')
+        ?? extractBuildSettingListOrSingle(buildSettingsContent, 'OTHER_CFLAGS');
 
     // Extract linker flags (OTHER_LDFLAGS)
-    const otherLdflagsMatch = buildSettingsContent.match(/OTHER_LDFLAGS\s*=\s*\(([\s\S]*?)\);/);
-    if (otherLdflagsMatch) {
-        settings.additionalLinkOptions = extractListItems(otherLdflagsMatch[1]);
-    }
+    settings.additionalLinkOptions = extractBuildSettingListOrSingle(buildSettingsContent, 'OTHER_LDFLAGS');
 
     // Extract library search paths (LIBRARY_SEARCH_PATHS)
-    const librarySearchMatch = buildSettingsContent.match(/LIBRARY_SEARCH_PATHS\s*=\s*\(([\s\S]*?)\);/);
-    if (librarySearchMatch) {
-        settings.additionalLibraryDirectories = extractListItems(librarySearchMatch[1]);
-    }
+    settings.additionalLibraryDirectories = extractBuildSettingListOrSingle(buildSettingsContent, 'LIBRARY_SEARCH_PATHS');
+
+    // Extract framework search paths (FRAMEWORK_SEARCH_PATHS)
+    settings.frameworkSearchPaths = extractBuildSettingListOrSingle(buildSettingsContent, 'FRAMEWORK_SEARCH_PATHS');
 
     return settings;
 }
@@ -522,6 +728,80 @@ function parseCxxStandard(standard: string): number | undefined {
         return parseInt(match[1], 10);
     }
     return undefined;
+}
+
+/**
+ * Parse C standard from Xcode format
+ * @param standard The standard string (e.g., "gnu11", "c11", "c17")
+ * @returns Numeric standard version or undefined
+ */
+function parseCStandard(standard: string): number | undefined {
+    const match = standard.match(/(\d+)/);
+    if (match) {
+        return parseInt(match[1], 10);
+    }
+    return undefined;
+}
+
+/**
+ * Extract a build setting that can be either a list (parenthesized) or a single value
+ * @param buildSettingsContent The build settings section content
+ * @param key The setting key name
+ * @returns Array of values, or undefined if not found
+ */
+function extractBuildSettingListOrSingle(buildSettingsContent: string, key: string): string[] | undefined {
+    // Try list format first: KEY = (\n"value1",\n"value2",\n);
+    const listMatch = buildSettingsContent.match(new RegExp(key + '\\s*=\\s*\\(([\\s\\S]*?)\\);'));
+    if (listMatch) {
+        const items = extractListItems(listMatch[1]);
+        return items.length > 0 ? items : undefined;
+    }
+    
+    // Try single value format: KEY = "value"; or KEY = value;
+    const singleMatch = buildSettingsContent.match(new RegExp(key + '\\s*=\\s*"?([^";]+)"?;'));
+    if (singleMatch) {
+        const value = singleMatch[1].trim();
+        // Skip inherited values like $(inherited)
+        if (value && value !== '$(inherited)') {
+            return [value];
+        }
+    }
+    
+    return undefined;
+}
+
+/**
+ * Parse a copy files build phase
+ * @param phase The copy files build phase object definition
+ * @param objects All objects for reference lookup
+ * @returns Parsed copy files phase or undefined
+ */
+function parseCopyFilesPhase(phase: string, objects: Record<string, string>): CopyFilesPhase | undefined {
+    const files = extractBuildPhaseFiles(phase, objects);
+    if (files.length === 0) {
+        return undefined;
+    }
+
+    const copyPhase: CopyFilesPhase = {
+        files
+    };
+
+    const nameMatch = phase.match(/name\s*=\s*([^;]+);/);
+    if (nameMatch) {
+        copyPhase.name = unquoteString(nameMatch[1].trim());
+    }
+
+    const dstSubfolderSpecMatch = phase.match(/dstSubfolderSpec\s*=\s*(\d+);/);
+    if (dstSubfolderSpecMatch) {
+        copyPhase.dstSubfolderSpec = parseInt(dstSubfolderSpecMatch[1], 10);
+    }
+
+    const dstPathMatch = phase.match(/dstPath\s*=\s*"?([^";]*)"?;/);
+    if (dstPathMatch) {
+        copyPhase.dstPath = dstPathMatch[1].trim();
+    }
+
+    return copyPhase;
 }
 
 /**
@@ -547,7 +827,7 @@ function mergeUnique(arr1: string[], arr2: string[]): string[] {
  */
 function parseShellScriptPhase(phase: string): ShellScriptPhase | undefined {
     // Extract shell script
-    const shellScriptMatch = phase.match(/shellScript\s*=\s*"([^"]*(?:\\.[^"]*)*)"/);
+    const shellScriptMatch = phase.match(/shellScript\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
     if (!shellScriptMatch) {
         return undefined;
     }
