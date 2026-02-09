@@ -15,13 +15,13 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.number-sign.cmake",
-          "match": "#.*$"
-        },
-        {
           "name": "comment.block.cmake",
           "begin": "#\\[\\[",
           "end": "\\]\\]"
+        },
+        {
+          "name": "comment.line.number-sign.cmake",
+          "match": "#.*$"
         }
       ]
     },
