@@ -15,11 +15,18 @@
   ],
   "keywords": [
     "cmake",
+    "cpp",
+    "c++",
+    "build",
     "path",
     "variables",
     "navigation",
     "syntax highlighting",
-    "formatting"
+    "formatting",
+    "linting",
+    "intellisense",
+    "vcxproj",
+    "xcodeproj"
   ],
   "activationEvents": [
     "onLanguage:cmake",
