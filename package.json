@@ -1,0 +1,231 @@
+{
+  "name": "cmake-companion",
+  "displayName": "CMake Companion",
+  "description": "Your intelligent CMake development companion - featuring path navigation, smart completions, formatting, diagnostics, and project conversion tools",
+  "version": "0.0.1",
+  "publisher": "appledragon",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Other"
+  ],
+  "keywords": [
+    "cmake",
+    "path",
+    "variables",
+    "navigation",
+    "syntax highlighting",
+    "formatting"
+  ],
+  "activationEvents": [
+    "onLanguage:cmake",
+    "workspaceContains:**/CMakeLists.txt",
+    "onLanguage:xml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cmake-companion.resolvePath",
+        "title": "Resolve CMake Path"
+      },
+      {
+        "command": "cmake-companion.refreshVariables",
+        "title": "Refresh CMake Variables"
+      },
+      {
+        "command": "cmake-companion.convertVcxprojToCMake",
+        "title": "Convert vcxproj to CMake"
+      },
+      {
+        "command": "cmake-companion.convertXcodeprojToCMake",
+        "title": "Convert Xcode project to CMake"
+      }
+    ],
+    "configuration": {
+      "title": "CMake Companion",
+      "properties": {
+        "cmake-companion.customVariables": {
+          "type": "object",
+          "default": {},
+          "description": "Custom variable mappings (e.g., {\"MY_WORKSPACE_PATH\": \"/path/to/workspace\"})"
+        },
+        "cmake-companion.enabledFileTypes": {
+          "type": "array",
+          "default": [
+            "cmake"
+          ],
+          "description": "File types where CMake path resolution is enabled"
+        },
+        "cmake-companion.environmentVariables": {
+          "type": "object",
+          "default": {},
+          "description": "Environment variable overrides used for $ENV{VAR} resolution"
+        },
+        "cmake-companion.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose debug logging in the output channel"
+        },
+        "cmake-companion.formatting.style": {
+          "type": "string",
+          "enum": [
+            "default",
+            "google"
+          ],
+          "default": "google",
+          "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
+        },
+        "cmake-companion.formatting.maxLineLength": {
+          "type": "number",
+          "description": "Maximum line length for formatting (0 = no limit). Overrides the style preset value when set."
+        },
+        "cmake-companion.formatting.spaceAfterOpenParen": {
+          "type": "boolean",
+          "description": "Add space after opening parenthesis in commands. Overrides the style preset value when set."
+        },
+        "cmake-companion.formatting.spaceBeforeCloseParen": {
+          "type": "boolean",
+          "description": "Add space before closing parenthesis in commands. Overrides the style preset value when set."
+        },
+        "cmake-companion.formatting.uppercaseCommands": {
+          "type": "boolean",
+          "description": "Convert CMake command names to uppercase. Overrides the style preset value when set."
+        },
+        "cmake-companion.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CMake diagnostics and linting"
+        },
+        "cmake-companion.diagnostics.undefinedVariables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn on undefined variables"
+        },
+        "cmake-companion.diagnostics.unmatchedBlocks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Error on unmatched block pairs (if/endif, function/endfunction, etc.)"
+        },
+        "cmake-companion.diagnostics.deprecatedCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hint on deprecated CMake commands"
+        },
+        "cmake-companion.diagnostics.nonExistentPaths": {
+          "type": "boolean",
+          "default": false,
+          "description": "Warn on non-existent file paths (may be slow for large files)"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "cmake",
+        "aliases": [
+          "CMake",
+          "cmake"
+        ],
+        "extensions": [
+          ".cmake"
+        ],
+        "filenames": [
+          "CMakeLists.txt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cmake",
+        "scopeName": "source.cmake",
+        "path": "./syntaxes/cmake.tmLanguage.json"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "cmake",
+        "scopes": {
+          "variable": [
+            "variable.other.cmake"
+          ],
+          "variable.readonly": [
+            "variable.other.constant.cmake"
+          ],
+          "variable.defaultLibrary": [
+            "support.variable.cmake"
+          ],
+          "function": [
+            "entity.name.function.cmake"
+          ],
+          "function.defaultLibrary": [
+            "support.function.cmake"
+          ],
+          "keyword": [
+            "keyword.control.cmake"
+          ],
+          "namespace": [
+            "entity.name.namespace.cmake"
+          ],
+          "property": [
+            "variable.other.property.cmake"
+          ]
+        }
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "cmake-companion.convertVcxprojToCMake",
+          "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        },
+        {
+          "command": "cmake-companion.convertXcodeprojToCMake",
+          "when": "explorerResourceIsFolder && resourceFilename =~ /\\.xcodeproj$/",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "cmake-companion.convertVcxprojToCMake",
+          "when": "resourceExtname == .vcxproj",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./dist/test/runTest.js",
+    "test:unit": "mocha --require ts-node/register 'src/test/**/*.test.ts'",
+    "test:coverage": "nyc mocha --require ts-node/register 'src/test/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.2",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.39.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "nyc": "^17.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appledragon/cmake-companion"
+  }
+}

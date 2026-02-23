@@ -1,0 +1,21 @@
+{
+  "extends": "@istanbuljs/nyc-config-typescript",
+  "all": true,
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/test/**",
+    "src/**/*.d.ts",
+    "src/extension.ts",
+    "src/providers/**",
+    "src/services/fileWatcher.ts",
+    "src/services/variableResolver.ts",
+    "src/services/index.ts"
+  ],
+  "reporter": [
+    "text",
+    "text-summary"
+  ],
+  "check-coverage": false
+}

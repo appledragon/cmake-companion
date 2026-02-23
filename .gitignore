@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vscode-test/
+*.vsix
+.DS_Store
+*.log
+.idea/
+*.swp
+*.swo
+coverage/
+/.nyc_output
