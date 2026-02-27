@@ -62,7 +62,7 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
         // Listen for configuration changes
         this.disposables.push(
             vscode.workspace.onDidChangeConfiguration((event) => {
-                if (event.affectsConfiguration('cmake-path-resolver')) {
+                if (event.affectsConfiguration('cmake-companion')) {
                     this.loadConfiguration();
                     // Re-analyze all open documents
                     if (this.enabled) {
@@ -79,7 +79,7 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
     }
     
     private loadConfiguration(): void {
-        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const config = vscode.workspace.getConfiguration('cmake-companion');
         this.enabled = config.get<boolean>('diagnostics.enabled', true);
     }
     
@@ -119,7 +119,7 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
         
         const diagnostics: vscode.Diagnostic[] = [];
         const text = document.getText();
-        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const config = vscode.workspace.getConfiguration('cmake-companion');
         
         // Check for undefined variables
         if (config.get<boolean>('diagnostics.undefinedVariables', true)) {

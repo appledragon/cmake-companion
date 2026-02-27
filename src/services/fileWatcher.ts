@@ -94,8 +94,8 @@ export class FileWatcher implements vscode.Disposable {
         }
         
         // Trigger refresh of decorations in open editors
-        vscode.commands.executeCommand('cmake-path-resolver.internal.refreshDecorations');
-        vscode.commands.executeCommand('cmake-path-resolver.internal.refreshStatus', {
+        vscode.commands.executeCommand('cmake-companion.internal.refreshDecorations');
+        vscode.commands.executeCommand('cmake-companion.internal.refreshStatus', {
             count: resolver.getVariableNames().length,
             lastRefreshed: new Date().toISOString(),
             mode: 'incremental'

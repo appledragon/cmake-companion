@@ -129,41 +129,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     
     // Register commands
     const resolvePathCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.resolvePath',
+        'cmake-companion.resolvePath',
         resolvePathCommandHandler
     );
     context.subscriptions.push(resolvePathCommand);
     
     const refreshCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.refreshVariables',
+        'cmake-companion.refreshVariables',
         refreshVariablesCommandHandler
     );
     context.subscriptions.push(refreshCommand);
     
     // Command to open paths (files or directories)
     const openPathCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.openPath',
+        'cmake-companion.openPath',
         openPathCommandHandler
     );
     context.subscriptions.push(openPathCommand);
     
     // Command to convert vcxproj to CMake
     const convertVcxprojCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.convertVcxprojToCMake',
+        'cmake-companion.convertVcxprojToCMake',
         convertVcxprojToCMakeHandler
     );
     context.subscriptions.push(convertVcxprojCommand);
     
     // Command to convert Xcode project to CMake
     const convertXcodeprojCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.convertXcodeprojToCMake',
+        'cmake-companion.convertXcodeprojToCMake',
         convertXcodeprojToCMakeHandler
     );
     context.subscriptions.push(convertXcodeprojCommand);
     
     // Internal command to refresh decorations (used by file watcher)
     const internalRefreshCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.internal.refreshDecorations',
+        'cmake-companion.internal.refreshDecorations',
         () => {
             // Trigger re-validation of open documents
             // This will cause the providers to re-evaluate
@@ -172,7 +172,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(internalRefreshCommand);
 
     const internalStatusCommand = vscode.commands.registerCommand(
-        'cmake-path-resolver.internal.refreshStatus',
+        'cmake-companion.internal.refreshStatus',
         (info?: { count?: number; lastRefreshed?: string }) => {
             if (info?.lastRefreshed) {
                 lastRefreshed = new Date(info.lastRefreshed);
@@ -211,7 +211,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Listen for configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('cmake-path-resolver')) {
+            if (e.affectsConfiguration('cmake-companion')) {
                 resolver.clear();
                 // Reparse only currently open CMake files
                 for (const document of vscode.workspace.textDocuments) {

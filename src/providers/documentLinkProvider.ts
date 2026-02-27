@@ -87,7 +87,7 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
                 
                 if (isList) {
                     const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
-                    linkTarget = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
+                    linkTarget = vscode.Uri.parse(`command:cmake-companion.openPath?${params}`);
                     const items = resolved.resolved.split(';');
                     const existCount = items.filter(i => { try { return fs.existsSync(i.trim()); } catch { return false; } }).length;
                     tooltip = `${existCount}/${items.length} files found (ctrl + click to select)`;
@@ -97,7 +97,7 @@ export class CMakeDocumentLinkProvider implements vscode.DocumentLinkProvider {
                     if (isDir) {
                         // Directories need the command handler for reveal-in-explorer logic
                         const params = encodeURIComponent(JSON.stringify([resolved.resolved]));
-                        linkTarget = vscode.Uri.parse(`command:cmake-path-resolver.openPath?${params}`);
+                        linkTarget = vscode.Uri.parse(`command:cmake-companion.openPath?${params}`);
                         tooltip = `Open directory: ${resolved.resolved}`;
                     } else {
                         // Files can use file URI directly — most reliable

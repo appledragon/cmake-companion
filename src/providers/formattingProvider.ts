@@ -105,7 +105,7 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
      * Supports style presets (default, google) with individual option overrides
      */
     private getFormattingOptions(options: vscode.FormattingOptions): CMakeFormattingOptions {
-        const config = vscode.workspace.getConfiguration('cmake-path-resolver');
+        const config = vscode.workspace.getConfiguration('cmake-companion');
         
         // Get the style preset (default or google)
         const style = config.get<CMakeFormattingStyle>('formatting.style', 'google');
