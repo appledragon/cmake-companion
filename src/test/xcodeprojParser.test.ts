@@ -756,5 +756,232 @@ describe('Xcodeproj Parser', () => {
             assert.ok(Array.isArray(project.resourceFiles));
             assert.strictEqual(project.resourceFiles.length, 0);
         });
+
+        it('should parse SDKROOT', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Debug */,
+			);
+			defaultConfigurationName = Debug;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.strictEqual(project.sdkRoot, 'iphoneos');
+        });
+
+        it('should parse LD_RUNPATH_SEARCH_PATHS', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+			};
+			name = Debug;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Debug */,
+			);
+			defaultConfigurationName = Debug;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.ok(project.runpathSearchPaths);
+            assert.ok(project.runpathSearchPaths!.includes('@executable_path/../Frameworks'));
+            assert.ok(project.runpathSearchPaths!.includes('@loader_path/../Frameworks'));
+        });
+
+        it('should parse DEAD_CODE_STRIPPING', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+			};
+			name = Release;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.strictEqual(project.deadCodeStripping, true);
+        });
+
+        it('should parse GCC_TREAT_WARNINGS_AS_ERRORS', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+			};
+			name = Debug;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Debug */,
+			);
+			defaultConfigurationName = Debug;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.strictEqual(project.treatWarningsAsErrors, true);
+        });
+
+        it('should parse CLANG_CXX_LIBRARY', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LIBRARY = "libc++";
+			};
+			name = Debug;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Debug */,
+			);
+			defaultConfigurationName = Debug;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.strictEqual(project.cxxLibrary, 'libc++');
+        });
+
+        it('should parse target dependencies', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		AAAA111111111111111111AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = CoreLib;
+			targetProxy = BBBB222222222222222222BB /* PBXContainerItemProxy */;
+		};
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			dependencies = (
+				AAAA111111111111111111AA /* PBXTargetDependency */,
+			);
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.ok(project.targetDependencies);
+            assert.ok(project.targetDependencies!.includes('CoreLib'));
+        });
+
+        it('should parse config-specific dead code stripping and warnings as errors', () => {
+            const content = `// !$*UTF8*$!
+{
+	objects = {
+		456789ABCDEF123456789ABC /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56789ABCDEF123456789ABCD /* Build configuration list */;
+			buildPhases = ();
+			name = MyApp;
+			productType = "com.apple.product-type.tool";
+		};
+		789ABCDEF123456789ABCDEF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+			};
+			name = Debug;
+		};
+		89ABCDEF123456789ABCDEF12 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEAD_CODE_STRIPPING = YES;
+			};
+			name = Release;
+		};
+		56789ABCDEF123456789ABCD /* Build configuration list */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				789ABCDEF123456789ABCDEF1 /* Debug */,
+				89ABCDEF123456789ABCDEF12 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+	};
+}`;
+            const project = parseXcodeproj(content, '/path/to/MyApp.xcodeproj');
+            assert.ok(project.configurations);
+            assert.strictEqual(project.configurations!.Debug?.treatWarningsAsErrors, true);
+            assert.strictEqual(project.configurations!.Release?.deadCodeStripping, true);
+        });
     });
 });

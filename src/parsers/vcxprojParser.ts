@@ -29,6 +29,10 @@ export interface BuildEvent {
     message?: string;
     /** Output files (for CustomBuildStep) */
     outputs?: string[];
+    /** Configuration|Platform condition (e.g., "Release|Win32") */
+    condition?: string;
+    /** Whether this event is enabled (PreBuildEventUseInBuild) */
+    enabled?: boolean;
 }
 
 export interface VcxprojProject {
@@ -98,6 +102,20 @@ export interface VcxprojProject {
     stringPooling?: boolean;
     /** Conformance mode (/permissive-) */
     conformanceMode?: boolean;
+    /** Basic runtime checks (e.g., /RTC1) */
+    basicRuntimeChecks?: string;
+    /** Disabled specific warnings (e.g., ['4251', '4275']) */
+    disableSpecificWarnings?: string[];
+    /** Favor size or speed (Size=/Os, Speed=/Ot) */
+    favorSizeOrSpeed?: string;
+    /** Control flow guard (/guard:cf) */
+    controlFlowGuard?: boolean;
+    /** Enable COMDAT folding (/OPT:ICF) */
+    enableCOMDATFolding?: boolean;
+    /** Optimize references (/OPT:REF) */
+    optimizeReferences?: boolean;
+    /** Generate map file (/MAP) */
+    generateMapFile?: boolean;
     /** Precompiled header configuration */
     pchConfig?: PchConfig;
     /** Build events (pre-build, post-build, custom build steps) */
@@ -137,6 +155,14 @@ export interface VcxprojConfigSettings {
     intrinsicFunctions?: boolean;
     wholeProgramOptimization?: boolean;
     generateDebugInformation?: boolean | string;
+    conformanceMode?: boolean;
+    basicRuntimeChecks?: string;
+    disableSpecificWarnings?: string[];
+    favorSizeOrSpeed?: string;
+    controlFlowGuard?: boolean;
+    enableCOMDATFolding?: boolean;
+    optimizeReferences?: boolean;
+    generateMapFile?: boolean;
 }
 
 /**
@@ -375,6 +401,54 @@ export function parseVcxproj(content: string, projectPath: string): VcxprojProje
     const conformanceValue = conformanceMatch ? parseBooleanValue(conformanceMatch[1]) : undefined;
     if (conformanceValue !== undefined) {
         project.conformanceMode = conformanceValue;
+    }
+
+    // Extract basic runtime checks
+    const rtcMatch = contentWithoutConditionalItemDefinitionGroups.match(/<BasicRuntimeChecks>(.*?)<\/BasicRuntimeChecks>/);
+    if (rtcMatch) {
+        project.basicRuntimeChecks = rtcMatch[1].trim();
+    }
+
+    // Extract disabled specific warnings
+    const dswMatch = contentWithoutConditionalItemDefinitionGroups.match(/<DisableSpecificWarnings>(.*?)<\/DisableSpecificWarnings>/);
+    if (dswMatch) {
+        const warnings = dswMatch[1].split(';').map(w => w.trim()).filter(w => w && w !== '%(DisableSpecificWarnings)');
+        if (warnings.length > 0) {
+            project.disableSpecificWarnings = warnings;
+        }
+    }
+
+    // Extract favor size or speed
+    const fssMatch = contentWithoutConditionalItemDefinitionGroups.match(/<FavorSizeOrSpeed>(.*?)<\/FavorSizeOrSpeed>/);
+    if (fssMatch) {
+        project.favorSizeOrSpeed = fssMatch[1].trim();
+    }
+
+    // Extract control flow guard
+    const cfgMatch = contentWithoutConditionalItemDefinitionGroups.match(/<ControlFlowGuard>(.*?)<\/ControlFlowGuard>/);
+    if (cfgMatch) {
+        project.controlFlowGuard = cfgMatch[1].trim() === 'Guard';
+    }
+
+    // Extract enable COMDAT folding (linker)
+    const comdatMatch = contentWithoutConditionalItemDefinitionGroups.match(/<EnableCOMDATFolding>(.*?)<\/EnableCOMDATFolding>/);
+    const comdatValue = comdatMatch ? parseBooleanValue(comdatMatch[1]) : undefined;
+    if (comdatValue !== undefined) {
+        project.enableCOMDATFolding = comdatValue;
+    }
+
+    // Extract optimize references (linker)
+    const optRefMatch = contentWithoutConditionalItemDefinitionGroups.match(/<OptimizeReferences>(.*?)<\/OptimizeReferences>/);
+    const optRefValue = optRefMatch ? parseBooleanValue(optRefMatch[1]) : undefined;
+    if (optRefValue !== undefined) {
+        project.optimizeReferences = optRefValue;
+    }
+
+    // Extract generate map file (linker)
+    const mapFileMatch = contentWithoutConditionalItemDefinitionGroups.match(/<GenerateMapFile>(.*?)<\/GenerateMapFile>/);
+    const mapFileValue = mapFileMatch ? parseBooleanValue(mapFileMatch[1]) : undefined;
+    if (mapFileValue !== undefined) {
+        project.generateMapFile = mapFileValue;
     }
 
     // Extract C language standard
@@ -791,6 +865,53 @@ function parseConfigurationSettings(content: string): Record<string, VcxprojConf
             settings.generateDebugInformation = boolVal !== undefined ? boolVal : val;
         }
 
+        const conformanceMatch = blockContent.match(/<ConformanceMode>(.*?)<\/ConformanceMode>/);
+        const conformanceValue = conformanceMatch ? parseBooleanValue(conformanceMatch[1]) : undefined;
+        if (conformanceValue !== undefined) {
+            settings.conformanceMode = conformanceValue;
+        }
+
+        const rtcMatch = blockContent.match(/<BasicRuntimeChecks>(.*?)<\/BasicRuntimeChecks>/);
+        if (rtcMatch) {
+            settings.basicRuntimeChecks = rtcMatch[1].trim();
+        }
+
+        const dswMatch = blockContent.match(/<DisableSpecificWarnings>(.*?)<\/DisableSpecificWarnings>/);
+        if (dswMatch) {
+            const warnings = dswMatch[1].split(';').map(w => w.trim()).filter(w => w && w !== '%(DisableSpecificWarnings)');
+            if (warnings.length > 0) {
+                settings.disableSpecificWarnings = warnings;
+            }
+        }
+
+        const fssMatch = blockContent.match(/<FavorSizeOrSpeed>(.*?)<\/FavorSizeOrSpeed>/);
+        if (fssMatch) {
+            settings.favorSizeOrSpeed = fssMatch[1].trim();
+        }
+
+        const cfgMatch = blockContent.match(/<ControlFlowGuard>(.*?)<\/ControlFlowGuard>/);
+        if (cfgMatch) {
+            settings.controlFlowGuard = cfgMatch[1].trim() === 'Guard';
+        }
+
+        const comdatMatch = blockContent.match(/<EnableCOMDATFolding>(.*?)<\/EnableCOMDATFolding>/);
+        const comdatValue = comdatMatch ? parseBooleanValue(comdatMatch[1]) : undefined;
+        if (comdatValue !== undefined) {
+            settings.enableCOMDATFolding = comdatValue;
+        }
+
+        const optRefMatch = blockContent.match(/<OptimizeReferences>(.*?)<\/OptimizeReferences>/);
+        const optRefValue = optRefMatch ? parseBooleanValue(optRefMatch[1]) : undefined;
+        if (optRefValue !== undefined) {
+            settings.optimizeReferences = optRefValue;
+        }
+
+        const mapFileMatch = blockContent.match(/<GenerateMapFile>(.*?)<\/GenerateMapFile>/);
+        const mapFileValue = mapFileMatch ? parseBooleanValue(mapFileMatch[1]) : undefined;
+        if (mapFileValue !== undefined) {
+            settings.generateMapFile = mapFileValue;
+        }
+
         if (Object.keys(settings).length > 0) {
             const existing = configMap[configName];
             configMap[configName] = existing ? mergeConfigSettings(existing, settings) : settings;
@@ -833,7 +954,15 @@ function mergeConfigSettings(base: VcxprojConfigSettings, incoming: VcxprojConfi
         functionLevelLinking: incoming.functionLevelLinking ?? base.functionLevelLinking,
         intrinsicFunctions: incoming.intrinsicFunctions ?? base.intrinsicFunctions,
         wholeProgramOptimization: incoming.wholeProgramOptimization ?? base.wholeProgramOptimization,
-        generateDebugInformation: incoming.generateDebugInformation ?? base.generateDebugInformation
+        generateDebugInformation: incoming.generateDebugInformation ?? base.generateDebugInformation,
+        conformanceMode: incoming.conformanceMode ?? base.conformanceMode,
+        basicRuntimeChecks: incoming.basicRuntimeChecks ?? base.basicRuntimeChecks,
+        disableSpecificWarnings: mergeUniqueStrings(base.disableSpecificWarnings, incoming.disableSpecificWarnings ?? []),
+        favorSizeOrSpeed: incoming.favorSizeOrSpeed ?? base.favorSizeOrSpeed,
+        controlFlowGuard: incoming.controlFlowGuard ?? base.controlFlowGuard,
+        enableCOMDATFolding: incoming.enableCOMDATFolding ?? base.enableCOMDATFolding,
+        optimizeReferences: incoming.optimizeReferences ?? base.optimizeReferences,
+        generateMapFile: incoming.generateMapFile ?? base.generateMapFile
     };
 }
 
@@ -955,59 +1084,119 @@ function parseBuildEvents(content: string): BuildEvent[] | undefined {
         return match ? decodeXmlEntities(match[1].trim()) : undefined;
     };
 
-    // Extract PreBuildEvent (handle multiple occurrences across configurations)
-    const preBuildMatches = content.matchAll(/<PreBuildEvent>([\s\S]*?)<\/PreBuildEvent>/g);
-    for (const preBuildMatch of preBuildMatches) {
-        const command = extractCommand(preBuildMatch[1]);
-        const message = extractMessage(preBuildMatch[1]);
-        if (command) {
-            if (!buildEvents.some(e => e.type === 'PreBuild' && e.command === command)) {
-                buildEvents.push({ type: 'PreBuild', command, message });
+    // Helper to check if an event type has UseInBuild=false within an ItemDefinitionGroup
+    const checkUseInBuild = (blockContent: string, eventType: string): boolean | undefined => {
+        const useInBuildMatch = blockContent.match(new RegExp(`<${eventType}EventUseInBuild>(.*?)<\\/${eventType}EventUseInBuild>`));
+        if (useInBuildMatch) {
+            return parseBooleanValue(useInBuildMatch[1]) ?? true;
+        }
+        return undefined;
+    };
+
+    // Parse build events from conditional ItemDefinitionGroups (configuration-specific)
+    const conditionalGroups = content.matchAll(/<ItemDefinitionGroup\s+Condition="([^"]+)"[^>]*>([\s\S]*?)<\/ItemDefinitionGroup>/g);
+    for (const groupMatch of conditionalGroups) {
+        const condition = groupMatch[1];
+        const blockContent = groupMatch[2];
+        const configPlatform = extractConfigPlatformFromCondition(condition);
+
+        for (const eventType of ['PreBuild', 'PreLink', 'PostBuild'] as const) {
+            const eventTag = `${eventType}Event`;
+            const eventRegex = new RegExp(`<${eventTag}>([\\s\\S]*?)<\\/${eventTag}>`, 'g');
+            const eventMatches = blockContent.matchAll(eventRegex);
+            for (const eventMatch of eventMatches) {
+                const command = extractCommand(eventMatch[1]);
+                const message = extractMessage(eventMatch[1]);
+                const useInBuild = checkUseInBuild(blockContent, eventType);
+                if (command) {
+                    const enabled = useInBuild !== undefined ? useInBuild : true;
+                    buildEvents.push({
+                        type: eventType,
+                        command,
+                        message,
+                        condition: configPlatform,
+                        enabled
+                    });
+                }
+            }
+        }
+
+        // CustomBuildStep
+        const customMatches = blockContent.matchAll(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/g);
+        for (const customMatch of customMatches) {
+            const command = extractCommand(customMatch[1]);
+            const message = extractMessage(customMatch[1]);
+            const outputsMatch = customMatch[1].match(/<Outputs>(.*?)<\/Outputs>/);
+            if (command) {
+                const outputs = outputsMatch
+                    ? outputsMatch[1].split(';').map(o => o.trim()).filter(o => o)
+                    : undefined;
+                buildEvents.push({
+                    type: 'CustomBuild',
+                    command,
+                    message,
+                    outputs,
+                    condition: configPlatform,
+                    enabled: true
+                });
             }
         }
     }
 
-    // Extract PreLinkEvent
-    const preLinkMatches = content.matchAll(/<PreLinkEvent>([\s\S]*?)<\/PreLinkEvent>/g);
-    for (const preLinkMatch of preLinkMatches) {
-        const command = extractCommand(preLinkMatch[1]);
-        const message = extractMessage(preLinkMatch[1]);
-        if (command) {
-            if (!buildEvents.some(e => e.type === 'PreLink' && e.command === command)) {
-                buildEvents.push({ type: 'PreLink', command, message });
+    // Parse build events from unconditional ItemDefinitionGroups
+    const unconditionalGroups = content.matchAll(/<ItemDefinitionGroup\s*>([\s\S]*?)<\/ItemDefinitionGroup>/g);
+    for (const groupMatch of unconditionalGroups) {
+        const blockContent = groupMatch[1];
+
+        for (const eventType of ['PreBuild', 'PreLink', 'PostBuild'] as const) {
+            const eventTag = `${eventType}Event`;
+            const eventRegex = new RegExp(`<${eventTag}>([\\s\\S]*?)<\\/${eventTag}>`, 'g');
+            const eventMatches = blockContent.matchAll(eventRegex);
+            for (const eventMatch of eventMatches) {
+                const command = extractCommand(eventMatch[1]);
+                const message = extractMessage(eventMatch[1]);
+                const useInBuild = checkUseInBuild(blockContent, eventType);
+                if (command) {
+                    const enabled = useInBuild !== undefined ? useInBuild : true;
+                    if (!buildEvents.some(e => e.type === eventType && e.command === command && !e.condition)) {
+                        buildEvents.push({ type: eventType, command, message, enabled });
+                    }
+                }
             }
         }
-    }
 
-    // Extract PostBuildEvent
-    const postBuildMatches = content.matchAll(/<PostBuildEvent>([\s\S]*?)<\/PostBuildEvent>/g);
-    for (const postBuildMatch of postBuildMatches) {
-        const command = extractCommand(postBuildMatch[1]);
-        const message = extractMessage(postBuildMatch[1]);
-        if (command) {
-            if (!buildEvents.some(e => e.type === 'PostBuild' && e.command === command)) {
-                buildEvents.push({ type: 'PostBuild', command, message });
-            }
-        }
-    }
-
-    // Extract CustomBuildStep
-    const customBuildMatches = content.matchAll(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/g);
-    for (const customBuildMatch of customBuildMatches) {
-        const command = extractCommand(customBuildMatch[1]);
-        const message = extractMessage(customBuildMatch[1]);
-        const outputsMatch = customBuildMatch[1].match(/<Outputs>(.*?)<\/Outputs>/);
-        if (command) {
-            const outputs = outputsMatch
-                ? outputsMatch[1].split(';').map(o => o.trim()).filter(o => o)
-                : undefined;
-            if (!buildEvents.some(e => e.type === 'CustomBuild' && e.command === command)) {
-                buildEvents.push({ type: 'CustomBuild', command, message, outputs });
+        const customMatches = blockContent.matchAll(/<CustomBuildStep>([\s\S]*?)<\/CustomBuildStep>/g);
+        for (const customMatch of customMatches) {
+            const command = extractCommand(customMatch[1]);
+            const message = extractMessage(customMatch[1]);
+            const outputsMatch = customMatch[1].match(/<Outputs>(.*?)<\/Outputs>/);
+            if (command) {
+                const outputs = outputsMatch
+                    ? outputsMatch[1].split(';').map(o => o.trim()).filter(o => o)
+                    : undefined;
+                if (!buildEvents.some(e => e.type === 'CustomBuild' && e.command === command && !e.condition)) {
+                    buildEvents.push({ type: 'CustomBuild', command, message, outputs, enabled: true });
+                }
             }
         }
     }
 
     return buildEvents.length > 0 ? buildEvents : undefined;
+}
+
+/**
+ * Extract config|platform string from a condition attribute
+ */
+function extractConfigPlatformFromCondition(condition: string): string | undefined {
+    const match = condition.match(/'\$\(Configuration\)\|\$\(Platform\)'\s*==\s*'([^']+)'/);
+    if (match) {
+        return match[1];
+    }
+    const configOnly = condition.match(/'\$\(Configuration\)'\s*==\s*'([^']+)'/);
+    if (configOnly) {
+        return configOnly[1];
+    }
+    return undefined;
 }
 
 /**

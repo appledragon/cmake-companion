@@ -906,5 +906,196 @@ describe('Vcxproj Parser', () => {
             assert.strictEqual(project.projectReferences[0].path, '../MyLib/MyLib.vcxproj');
             assert.strictEqual(project.projectReferences[0].name, 'MyLib');
         });
+
+        it('should parse BasicRuntimeChecks', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.basicRuntimeChecks, 'EnableFastChecks');
+        });
+
+        it('should parse DisableSpecificWarnings', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <DisableSpecificWarnings>4251;4275;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.deepStrictEqual(project.disableSpecificWarnings, ['4251', '4275']);
+        });
+
+        it('should parse FavorSizeOrSpeed', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.favorSizeOrSpeed, 'Size');
+        });
+
+        it('should parse ControlFlowGuard', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.controlFlowGuard, true);
+        });
+
+        it('should parse EnableCOMDATFolding', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.enableCOMDATFolding, true);
+        });
+
+        it('should parse OptimizeReferences', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <Link>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.optimizeReferences, true);
+        });
+
+        it('should parse GenerateMapFile', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <Link>
+      <GenerateMapFile>true</GenerateMapFile>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.generateMapFile, true);
+        });
+
+        it('should parse config-specific new fields', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateMapFile>true</GenerateMapFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DisableSpecificWarnings>4251;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+
+            assert.ok(project.configurations);
+            const release = project.configurations!['Release'];
+            assert.ok(release);
+            assert.strictEqual(release.intrinsicFunctions, true);
+            assert.strictEqual(release.functionLevelLinking, true);
+            assert.strictEqual(release.favorSizeOrSpeed, 'Size');
+            assert.strictEqual(release.controlFlowGuard, true);
+            assert.strictEqual(release.conformanceMode, true);
+            assert.strictEqual(release.enableCOMDATFolding, true);
+            assert.strictEqual(release.optimizeReferences, true);
+            assert.strictEqual(release.generateMapFile, true);
+
+            const debug = project.configurations!['Debug'];
+            assert.ok(debug);
+            assert.strictEqual(debug.basicRuntimeChecks, 'EnableFastChecks');
+            assert.deepStrictEqual(debug.disableSpecificWarnings, ['4251']);
+            assert.strictEqual(debug.debugInformationFormat, 'EditAndContinue');
+        });
+
+        it('should parse build events with conditions', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <PreBuildEvent>
+      <Command>call build_spcpp.bat</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PreBuildEvent>
+      <Command>echo debug build</Command>
+    </PreBuildEvent>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+
+            assert.ok(project.buildEvents);
+            assert.strictEqual(project.buildEvents!.length, 2);
+
+            const releaseEvent = project.buildEvents!.find(e => e.command === 'call build_spcpp.bat');
+            assert.ok(releaseEvent);
+            assert.strictEqual(releaseEvent!.condition, 'Release|Win32');
+            assert.strictEqual(releaseEvent!.enabled, true);
+
+            const debugEvent = project.buildEvents!.find(e => e.command === 'echo debug build');
+            assert.ok(debugEvent);
+            assert.strictEqual(debugEvent!.condition, 'Debug|Win32');
+            assert.strictEqual(debugEvent!.enabled, false);
+        });
+
+        it('should parse LanguageStandard stdcpp20', () => {
+            const content = `<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>`;
+
+            const project = parseVcxproj(content, '/path/to/MyApp.vcxproj');
+            assert.strictEqual(project.cxxStandard, 20);
+        });
     });
 });

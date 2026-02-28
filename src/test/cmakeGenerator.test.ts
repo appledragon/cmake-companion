@@ -566,6 +566,191 @@ describe('CMake Generator', () => {
             // outputDirectory is not directly used in cmake generation
             assert.ok(cmake.includes('project(MyApp)'));
         });
+
+        it('should generate /Oi for intrinsicFunctions', () => {
+            const project = makeVcxProject({ intrinsicFunctions: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/Oi'));
+        });
+
+        it('should generate /Gy for functionLevelLinking', () => {
+            const project = makeVcxProject({ functionLevelLinking: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/Gy'));
+        });
+
+        it('should generate /Os for favorSizeOrSpeed=Size', () => {
+            const project = makeVcxProject({ favorSizeOrSpeed: 'Size' });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/Os'));
+        });
+
+        it('should generate /Ot for favorSizeOrSpeed=Speed', () => {
+            const project = makeVcxProject({ favorSizeOrSpeed: 'Speed' });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/Ot'));
+        });
+
+        it('should generate /guard:cf for controlFlowGuard', () => {
+            const project = makeVcxProject({ controlFlowGuard: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/guard:cf'));
+        });
+
+        it('should generate /permissive- for conformanceMode', () => {
+            const project = makeVcxProject({ conformanceMode: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/permissive-'));
+        });
+
+        it('should generate /RTC1 for basicRuntimeChecks=EnableFastChecks', () => {
+            const project = makeVcxProject({ basicRuntimeChecks: 'EnableFastChecks' });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/RTC1'));
+        });
+
+        it('should generate /wd flags for disableSpecificWarnings', () => {
+            const project = makeVcxProject({ disableSpecificWarnings: ['4251', '4275'] });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/wd4251'));
+            assert.ok(cmake.includes('/wd4275'));
+        });
+
+        it('should generate /GL and /LTCG for wholeProgramOptimization', () => {
+            const project = makeVcxProject({ wholeProgramOptimization: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/GL'), 'Should include /GL compiler flag');
+            assert.ok(cmake.includes('/LTCG'), 'Should include /LTCG linker flag');
+        });
+
+        it('should generate /OPT:REF for optimizeReferences', () => {
+            const project = makeVcxProject({ optimizeReferences: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/OPT:REF'));
+        });
+
+        it('should generate /OPT:ICF for enableCOMDATFolding', () => {
+            const project = makeVcxProject({ enableCOMDATFolding: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/OPT:ICF'));
+        });
+
+        it('should generate /MAP for generateMapFile', () => {
+            const project = makeVcxProject({ generateMapFile: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/MAP'));
+        });
+
+        it('should generate INTERPROCEDURAL_OPTIMIZATION for wholeProgramOptimization', () => {
+            const project = makeVcxProject({ wholeProgramOptimization: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('INTERPROCEDURAL_OPTIMIZATION TRUE'));
+        });
+
+        it('should generate /GF for stringPooling', () => {
+            const project = makeVcxProject({ stringPooling: true });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('/GF'));
+        });
+
+        it('should include resource files in the build', () => {
+            const project = makeVcxProject({
+                resourceFiles: ['SampleApp.rc']
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('# Resource files'));
+            assert.ok(cmake.includes('set(RESOURCE_FILES'));
+            assert.ok(cmake.includes('SampleApp.rc'));
+            assert.ok(cmake.includes('${RESOURCE_FILES}'));
+        });
+
+        it('should include project references as dependencies', () => {
+            const project = makeVcxProject({
+                projectReferences: [
+                    { path: '../GenerateProtobuf/GenerateProtobuf.vcxproj', name: 'GenerateProtobuf', projectGuid: '12345' }
+                ]
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('# Project dependencies'));
+            assert.ok(cmake.includes('GenerateProtobuf'));
+        });
+
+        it('should filter out disabled build events', () => {
+            const project = makeVcxProject({
+                buildEvents: [
+                    { type: 'PreBuild', command: 'echo enabled', enabled: true },
+                    { type: 'PreBuild', command: 'echo disabled', enabled: false }
+                ]
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('echo enabled'));
+            assert.ok(!cmake.includes('echo disabled'));
+        });
+
+        it('should wrap config-specific build events with generator expressions', () => {
+            const project = makeVcxProject({
+                buildEvents: [
+                    { type: 'PreBuild', command: 'call build_spcpp.bat', condition: 'Release|Win32', enabled: true }
+                ]
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:call build_spcpp.bat>'));
+        });
+
+        it('should convert MSBuild variables in library directories', () => {
+            const project = makeVcxProject({
+                additionalLibraryDirectories: ['$(OutDir)lib']
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('WARNING'));
+            assert.ok(cmake.includes('${CMAKE_BINARY_DIR}'));
+        });
+
+        it('should generate config-specific compiler options with new flags', () => {
+            const project = makeVcxProject({
+                configurations: {
+                    Release: {
+                        intrinsicFunctions: true,
+                        functionLevelLinking: true,
+                        favorSizeOrSpeed: 'Size',
+                        controlFlowGuard: true,
+                        conformanceMode: true,
+                        optimizeReferences: true,
+                        enableCOMDATFolding: true,
+                        generateMapFile: true
+                    },
+                    Debug: {
+                        basicRuntimeChecks: 'EnableFastChecks',
+                        disableSpecificWarnings: ['4251'],
+                        debugInformationFormat: 'EditAndContinue'
+                    }
+                }
+            });
+            const cmake = generateCMakeLists(project);
+            // Release compile options
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/Oi>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/Gy>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/Os>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/guard:cf>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/permissive->>'));
+            // Release link options
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/OPT:REF>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/OPT:ICF>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/MAP>>'));
+            // Debug compile options
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/RTC1>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/wd4251>>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/ZI>>'));
+        });
+
+        it('should use cmake 3.13 when link options from settings exist', () => {
+            const project = makeVcxProject({
+                optimizeReferences: true,
+                enableCOMDATFolding: true
+            });
+            const cmake = generateCMakeLists(project);
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.13)'));
+        });
     });
 
     describe('generateCMakeListsFromXcode', () => {
@@ -909,6 +1094,324 @@ describe('CMake Generator', () => {
             assert.ok(!cmake.includes('# Preprocessor definitions (Debug)'));
             assert.ok(!cmake.includes('# Compiler options (Debug)'));
             assert.ok(!cmake.includes('# Linker options (Debug)'));
+        });
+
+        it('should output C standard when specified', () => {
+            const project = makeXcodeProject({ cStandard: 11 });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('set(CMAKE_C_STANDARD 11)'));
+            assert.ok(cmake.includes('set(CMAKE_C_STANDARD_REQUIRED ON)'));
+        });
+
+        it('should output iOS deployment target', () => {
+            const project = makeXcodeProject({ iosDeploymentTarget: '15.0' });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# iOS deployment target'));
+            assert.ok(cmake.includes('set(CMAKE_OSX_DEPLOYMENT_TARGET 15.0)'));
+        });
+
+        it('should output SDKROOT as CMAKE_OSX_SYSROOT', () => {
+            const project = makeXcodeProject({ sdkRoot: 'iphoneos' });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('set(CMAKE_OSX_SYSROOT iphoneos)'));
+        });
+
+        it('should output C++ standard library', () => {
+            const project = makeXcodeProject({ cxxLibrary: 'libc++' });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-stdlib=libc++'));
+        });
+
+        it('should output -fobjc-arc for ARC enabled', () => {
+            const project = makeXcodeProject({ enableARC: true });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-fobjc-arc'));
+        });
+
+        it('should output -fno-objc-arc for ARC disabled', () => {
+            const project = makeXcodeProject({ enableARC: false });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-fno-objc-arc'));
+        });
+
+        it('should output -fmodules for enable modules', () => {
+            const project = makeXcodeProject({ enableModules: true });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-fmodules'));
+        });
+
+        it('should output -Werror for treat warnings as errors', () => {
+            const project = makeXcodeProject({ treatWarningsAsErrors: true });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-Werror'));
+        });
+
+        it('should output -dead_strip for dead code stripping', () => {
+            const project = makeXcodeProject({ deadCodeStripping: true });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('-dead_strip'));
+            assert.ok(cmake.includes('target_link_options'));
+        });
+
+        it('should output framework search paths', () => {
+            const project = makeXcodeProject({
+                frameworkSearchPaths: ['/Library/Frameworks', '/opt/local/Library/Frameworks']
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Framework search paths'));
+            assert.ok(cmake.includes('target_link_directories'));
+            assert.ok(cmake.includes('/Library/Frameworks'));
+            assert.ok(cmake.includes('/opt/local/Library/Frameworks'));
+        });
+
+        it('should output config-specific framework search paths', () => {
+            const project = makeXcodeProject({
+                configurations: {
+                    Debug: { frameworkSearchPaths: ['/debug/frameworks'] }
+                }
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Framework search paths (Debug)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:/debug/frameworks>'));
+        });
+
+        it('should output config-specific library directories', () => {
+            const project = makeXcodeProject({
+                configurations: {
+                    Release: { additionalLibraryDirectories: ['/release/lib'] }
+                }
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Additional library directories (Release)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:/release/lib>'));
+        });
+
+        it('should output runpath search paths', () => {
+            const project = makeXcodeProject({
+                runpathSearchPaths: ['@executable_path/../Frameworks', '@loader_path/../Frameworks']
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('BUILD_RPATH'));
+            assert.ok(cmake.includes('INSTALL_RPATH'));
+            assert.ok(cmake.includes('@executable_path/../Frameworks'));
+        });
+
+        it('should handle Framework type', () => {
+            const project = makeXcodeProject({
+                type: 'Framework',
+                sourceFiles: ['MyFramework.cpp'],
+                headerFiles: ['MyFramework.h']
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Create framework'));
+            assert.ok(cmake.includes('add_library(${PROJECT_NAME} SHARED ${SOURCES})'));
+            assert.ok(cmake.includes('FRAMEWORK TRUE'));
+        });
+
+        it('should handle Bundle type', () => {
+            const project = makeXcodeProject({
+                type: 'Bundle',
+                sourceFiles: ['MyPlugin.cpp']
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Create bundle'));
+            assert.ok(cmake.includes('add_library(${PROJECT_NAME} MODULE ${SOURCES})'));
+            assert.ok(cmake.includes('BUNDLE TRUE'));
+        });
+
+        it('should create MACOSX_BUNDLE for app with Info.plist', () => {
+            const project = makeXcodeProject({
+                infoPlistFile: 'MyApp/Info.plist'
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('MACOSX_BUNDLE'));
+            assert.ok(cmake.includes('MACOSX_BUNDLE_INFO_PLIST MyApp/Info.plist'));
+        });
+
+        it('should output product name when different from project name', () => {
+            const project = makeXcodeProject({
+                name: 'MyInternalName',
+                productName: 'MyPublicName'
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('OUTPUT_NAME "MyPublicName"'));
+        });
+
+        it('should not output product name when same as project name', () => {
+            const project = makeXcodeProject({
+                name: 'MyApp',
+                productName: 'MyApp'
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(!cmake.includes('OUTPUT_NAME'));
+        });
+
+        it('should output bundle identifier', () => {
+            const project = makeXcodeProject({
+                bundleIdentifier: 'com.example.MyApp'
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('MACOSX_BUNDLE_GUI_IDENTIFIER com.example.MyApp'));
+        });
+
+        it('should output resource files and mark for bundle', () => {
+            const project = makeXcodeProject({
+                resourceFiles: ['Assets.xcassets', 'LaunchScreen.storyboard'],
+                infoPlistFile: 'Info.plist'
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('set(RESOURCE_FILES'));
+            assert.ok(cmake.includes('Assets.xcassets'));
+            assert.ok(cmake.includes('LaunchScreen.storyboard'));
+            assert.ok(cmake.includes('${RESOURCE_FILES}'));
+            assert.ok(cmake.includes('MACOSX_PACKAGE_LOCATION Resources'));
+        });
+
+        it('should output copy files phases', () => {
+            const project = makeXcodeProject({
+                copyFilesPhases: [{
+                    name: 'Copy Libraries',
+                    dstPath: '/usr/local/lib',
+                    files: ['libfoo.dylib']
+                }]
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Copy files build phases'));
+            assert.ok(cmake.includes('# Copy Libraries'));
+            assert.ok(cmake.includes('copy_if_different libfoo.dylib /usr/local/lib'));
+        });
+
+        it('should output target dependencies', () => {
+            const project = makeXcodeProject({
+                targetDependencies: ['CoreLib', 'NetworkLib']
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('# Target dependencies'));
+            assert.ok(cmake.includes('add_dependencies(${PROJECT_NAME} CoreLib)'));
+            assert.ok(cmake.includes('add_dependencies(${PROJECT_NAME} NetworkLib)'));
+        });
+
+        it('should output config-specific optimization flags', () => {
+            const project = makeXcodeProject({
+                configurations: {
+                    Debug: { optimization: '0', debugInformationFormat: 'dwarf-with-dsym' },
+                    Release: { optimization: 's', debugInformationFormat: 'dwarf' }
+                }
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:-O0>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:-g>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:-Os>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:-g>'));
+        });
+
+        it('should output config-specific dead code stripping', () => {
+            const project = makeXcodeProject({
+                configurations: {
+                    Release: { deadCodeStripping: true }
+                }
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:-dead_strip>'));
+        });
+
+        it('should output config-specific -Werror', () => {
+            const project = makeXcodeProject({
+                configurations: {
+                    Debug: { treatWarningsAsErrors: true }
+                }
+            });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:-Werror>'));
+        });
+
+        it('should use cmake 3.13 for dead code stripping', () => {
+            const project = makeXcodeProject({ deadCodeStripping: true });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.13)'));
+        });
+
+        it('should use cmake 3.14 for MACOSX_BUNDLE app', () => {
+            const project = makeXcodeProject({ infoPlistFile: 'Info.plist' });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.14)'));
+        });
+
+        it('should use cmake 3.14 for Framework type', () => {
+            const project = makeXcodeProject({ type: 'Framework', sourceFiles: ['lib.cpp'] });
+            const cmake = generateCMakeListsFromXcode(project);
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.14)'));
+        });
+
+        it('should generate complete Xcode project with all new features', () => {
+            const project = makeXcodeProject({
+                name: 'FulliOSApp',
+                type: 'Application',
+                sourceFiles: ['main.m', 'AppDelegate.m'],
+                headerFiles: ['AppDelegate.h'],
+                resourceFiles: ['Assets.xcassets', 'Main.storyboard'],
+                cxxStandard: 20,
+                cStandard: 11,
+                sdkRoot: 'iphoneos',
+                iosDeploymentTarget: '15.0',
+                architecture: 'arm64',
+                bundleIdentifier: 'com.example.FulliOSApp',
+                infoPlistFile: 'FulliOSApp/Info.plist',
+                productName: 'Full iOS App',
+                enableARC: true,
+                enableModules: true,
+                treatWarningsAsErrors: true,
+                deadCodeStripping: true,
+                cxxLibrary: 'libc++',
+                runpathSearchPaths: ['@executable_path/Frameworks'],
+                frameworks: ['UIKit', 'Foundation'],
+                frameworkSearchPaths: ['/opt/frameworks'],
+                targetDependencies: ['CoreLib'],
+                configurations: {
+                    Debug: {
+                        optimization: '0',
+                        debugInformationFormat: 'dwarf-with-dsym',
+                        preprocessorDefinitions: ['DEBUG=1']
+                    },
+                    Release: {
+                        optimization: 's',
+                        preprocessorDefinitions: ['NDEBUG'],
+                        deadCodeStripping: true
+                    }
+                }
+            });
+
+            const cmake = generateCMakeListsFromXcode(project);
+
+            assert.ok(cmake.includes('cmake_minimum_required(VERSION 3.14)'));
+            assert.ok(cmake.includes('project(FulliOSApp)'));
+            assert.ok(cmake.includes('set(CMAKE_CXX_STANDARD 20)'));
+            assert.ok(cmake.includes('set(CMAKE_C_STANDARD 11)'));
+            assert.ok(cmake.includes('set(CMAKE_OSX_SYSROOT iphoneos)'));
+            assert.ok(cmake.includes('set(CMAKE_OSX_DEPLOYMENT_TARGET 15.0)'));
+            assert.ok(cmake.includes('set(CMAKE_OSX_ARCHITECTURES arm64)'));
+            assert.ok(cmake.includes('-stdlib=libc++'));
+            assert.ok(cmake.includes('MACOSX_BUNDLE'));
+            assert.ok(cmake.includes('${RESOURCE_FILES}'));
+            assert.ok(cmake.includes('MACOSX_PACKAGE_LOCATION Resources'));
+            assert.ok(cmake.includes('OUTPUT_NAME "Full iOS App"'));
+            assert.ok(cmake.includes('MACOSX_BUNDLE_GUI_IDENTIFIER com.example.FulliOSApp'));
+            assert.ok(cmake.includes('MACOSX_BUNDLE_INFO_PLIST FulliOSApp/Info.plist'));
+            assert.ok(cmake.includes('-fobjc-arc'));
+            assert.ok(cmake.includes('-fmodules'));
+            assert.ok(cmake.includes('-Werror'));
+            assert.ok(cmake.includes('-dead_strip'));
+            assert.ok(cmake.includes('BUILD_RPATH'));
+            assert.ok(cmake.includes('-framework UIKit'));
+            assert.ok(cmake.includes('-framework Foundation'));
+            assert.ok(cmake.includes('/opt/frameworks'));
+            assert.ok(cmake.includes('add_dependencies(${PROJECT_NAME} CoreLib)'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:-O0>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:-g>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Debug>:DEBUG=1>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:-Os>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:NDEBUG>'));
+            assert.ok(cmake.includes('$<$<CONFIG:Release>:-dead_strip>'));
         });
     });
 });

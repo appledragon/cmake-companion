@@ -70,10 +70,22 @@ export interface XcodeprojProject {
     enableModules?: boolean;
     /** Enable ARC (Automatic Reference Counting) for Objective-C */
     enableARC?: boolean;
+    /** SDK root (e.g., "macosx", "iphoneos") */
+    sdkRoot?: string;
+    /** Runpath search paths (LD_RUNPATH_SEARCH_PATHS) */
+    runpathSearchPaths?: string[];
+    /** Dead code stripping */
+    deadCodeStripping?: boolean;
+    /** Treat warnings as errors */
+    treatWarningsAsErrors?: boolean;
+    /** C++ standard library (e.g., "libc++", "libstdc++") */
+    cxxLibrary?: string;
     /** Shell script build phases (Run Script phases) */
     shellScriptPhases?: ShellScriptPhase[];
     /** Copy files build phases */
     copyFilesPhases?: CopyFilesPhase[];
+    /** Target dependencies (other targets this target depends on) */
+    targetDependencies?: string[];
     /** Configuration-specific settings (e.g., Debug/Release) */
     configurations?: Record<string, XcodeprojConfigSettings>;
 }
@@ -103,6 +115,10 @@ export interface XcodeprojConfigSettings {
     frameworkSearchPaths?: string[];
     optimization?: string;
     debugInformationFormat?: string;
+    /** Dead code stripping */
+    deadCodeStripping?: boolean;
+    /** Treat warnings as errors */
+    treatWarningsAsErrors?: boolean;
 }
 
 /**
@@ -311,6 +327,21 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                     if (project.enableARC === undefined && settings.enableARC !== undefined) {
                         project.enableARC = settings.enableARC;
                     }
+                    if (!project.sdkRoot && settings.sdkRoot) {
+                        project.sdkRoot = settings.sdkRoot;
+                    }
+                    if (!project.cxxLibrary && settings.cxxLibrary) {
+                        project.cxxLibrary = settings.cxxLibrary;
+                    }
+                    if (project.deadCodeStripping === undefined && settings.deadCodeStripping !== undefined) {
+                        project.deadCodeStripping = settings.deadCodeStripping;
+                    }
+                    if (project.treatWarningsAsErrors === undefined && settings.treatWarningsAsErrors !== undefined) {
+                        project.treatWarningsAsErrors = settings.treatWarningsAsErrors;
+                    }
+                    if (!project.runpathSearchPaths && settings.runpathSearchPaths) {
+                        project.runpathSearchPaths = settings.runpathSearchPaths;
+                    }
 
                     // Store config-specific settings
                     project.configurations[configName] = {
@@ -321,7 +352,9 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                         additionalLibraryDirectories: settings.additionalLibraryDirectories,
                         frameworkSearchPaths: settings.frameworkSearchPaths,
                         optimization: settings.optimization,
-                        debugInformationFormat: settings.debugInformationFormat
+                        debugInformationFormat: settings.debugInformationFormat,
+                        deadCodeStripping: settings.deadCodeStripping,
+                        treatWarningsAsErrors: settings.treatWarningsAsErrors
                     };
 
                     // Merge common settings
@@ -356,6 +389,53 @@ export function parseXcodeproj(content: string, projectPath: string): XcodeprojP
                 const filePath = unquoteString(pathMatch[1].trim());
                 if (isHeaderFile(filePath) && !project.headerFiles.includes(filePath)) {
                     project.headerFiles.push(filePath);
+                }
+            }
+        }
+    }
+
+    // Extract target dependencies
+    const dependenciesMatch = target.match(/dependencies\s*=\s*\(([\s\S]*?)\);/);
+    if (dependenciesMatch) {
+        const depIds = extractListItems(dependenciesMatch[1]);
+        for (const depId of depIds) {
+            const dep = objects[depId];
+            if (!dep || !dep.includes('PBXTargetDependency')) {
+                continue;
+            }
+            // Try to extract name from the dependency
+            const depNameMatch = dep.match(/name\s*=\s*([^;]+);/);
+            if (depNameMatch) {
+                if (!project.targetDependencies) {
+                    project.targetDependencies = [];
+                }
+                const depName = unquoteString(depNameMatch[1].trim());
+                if (depName && !project.targetDependencies.includes(depName)) {
+                    project.targetDependencies.push(depName);
+                }
+            } else {
+                // Try to resolve through the target proxy
+                const proxyMatch = dep.match(/targetProxy\s*=\s*([A-F0-9]+)/);
+                if (proxyMatch) {
+                    const proxy = objects[proxyMatch[1]];
+                    if (proxy) {
+                        const remoteTargetMatch = proxy.match(/remoteGlobalIDString\s*=\s*([A-F0-9]+)/);
+                        if (remoteTargetMatch) {
+                            const remoteTarget = objects[remoteTargetMatch[1]];
+                            if (remoteTarget) {
+                                const rtNameMatch = remoteTarget.match(/name\s*=\s*([^;]+);/);
+                                if (rtNameMatch) {
+                                    if (!project.targetDependencies) {
+                                        project.targetDependencies = [];
+                                    }
+                                    const depName = unquoteString(rtNameMatch[1].trim());
+                                    if (depName && !project.targetDependencies.includes(depName)) {
+                                        project.targetDependencies.push(depName);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -612,6 +692,11 @@ function extractBuildSettings(config: string): {
     enableARC?: boolean;
     optimization?: string;
     debugInformationFormat?: string;
+    sdkRoot?: string;
+    runpathSearchPaths?: string[];
+    deadCodeStripping?: boolean;
+    treatWarningsAsErrors?: boolean;
+    cxxLibrary?: string;
 } {
     const settings: ReturnType<typeof extractBuildSettings> = {};
 
@@ -713,6 +798,33 @@ function extractBuildSettings(config: string): {
 
     // Extract framework search paths (FRAMEWORK_SEARCH_PATHS)
     settings.frameworkSearchPaths = extractBuildSettingListOrSingle(buildSettingsContent, 'FRAMEWORK_SEARCH_PATHS');
+
+    // Extract SDKROOT
+    const sdkRootMatch = buildSettingsContent.match(/SDKROOT\s*=\s*"?([^";]+)"?;/);
+    if (sdkRootMatch) {
+        settings.sdkRoot = sdkRootMatch[1].trim();
+    }
+
+    // Extract LD_RUNPATH_SEARCH_PATHS
+    settings.runpathSearchPaths = extractBuildSettingListOrSingle(buildSettingsContent, 'LD_RUNPATH_SEARCH_PATHS');
+
+    // Extract DEAD_CODE_STRIPPING
+    const deadCodeMatch = buildSettingsContent.match(/DEAD_CODE_STRIPPING\s*=\s*([^;]+);/);
+    if (deadCodeMatch) {
+        settings.deadCodeStripping = deadCodeMatch[1].trim() === 'YES';
+    }
+
+    // Extract GCC_TREAT_WARNINGS_AS_ERRORS
+    const warningsAsErrorsMatch = buildSettingsContent.match(/GCC_TREAT_WARNINGS_AS_ERRORS\s*=\s*([^;]+);/);
+    if (warningsAsErrorsMatch) {
+        settings.treatWarningsAsErrors = warningsAsErrorsMatch[1].trim() === 'YES';
+    }
+
+    // Extract CLANG_CXX_LIBRARY
+    const cxxLibraryMatch = buildSettingsContent.match(/CLANG_CXX_LIBRARY\s*=\s*"?([^";]+)"?;/);
+    if (cxxLibraryMatch) {
+        settings.cxxLibrary = cxxLibraryMatch[1].trim();
+    }
 
     return settings;
 }
