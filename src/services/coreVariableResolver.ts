@@ -212,6 +212,15 @@ export class CoreVariableResolver {
         // Normalize path separators
         resolved = resolved.replace(/\\/g, '/');
         
+        // Normalize .. and . segments in resolved paths
+        if (unresolvedVariables.length === 0 && (resolved.includes('/..') || resolved.includes('/.'))) {
+            // Preserve leading slash for absolute paths
+            const isAbsolute = resolved.startsWith('/');
+            const normalized = path.posix.normalize(resolved);
+            // path.posix.normalize handles forward-slash paths correctly
+            resolved = isAbsolute && !normalized.startsWith('/') ? '/' + normalized : normalized;
+        }
+        
         // Check if the resolved path exists
         let exists = false;
         try {
@@ -255,6 +264,10 @@ export class CoreVariableResolver {
             this.projectName = projectName;
             this.setVariable('PROJECT_NAME', projectName);
             this.setVariable('CMAKE_PROJECT_NAME', projectName);
+            // In CMake, PROJECT_SOURCE_DIR is the directory of the CMakeLists.txt
+            // that contains the project() command
+            this.setVariable('PROJECT_SOURCE_DIR', dirPath);
+            this.setVariable('PROJECT_BINARY_DIR', path.join(dirPath, 'build'));
         }
         
         // Update directory-specific variables

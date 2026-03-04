@@ -230,6 +230,22 @@ describe('Core Variable Resolver', () => {
             const result = resolver.resolvePath('${UNKNOWN}/${UNKNOWN}');
             assert.strictEqual(result.unresolvedVariables.filter(v => v === 'UNKNOWN').length, 1);
         });
+
+        it('should normalize .. segments in fully resolved paths', () => {
+            resolver.setVariable('WORKSPACE', '${ROOT}/../..');
+            const result = resolver.resolvePath('${WORKSPACE}/common/platform');
+            assert.strictEqual(result.resolved, '/common/platform');
+        });
+
+        it('should normalize . segments in fully resolved paths', () => {
+            const result = resolver.resolvePath('${ROOT}/./src/../lib');
+            assert.strictEqual(result.resolved, '/project/lib');
+        });
+
+        it('should not normalize paths with unresolved variables', () => {
+            const result = resolver.resolvePath('${UNKNOWN}/../foo');
+            assert.strictEqual(result.resolved, '${UNKNOWN}/../foo');
+        });
     });
 
     describe('clear', () => {
@@ -259,6 +275,18 @@ set(OTHER_VAR "world")
             assert.strictEqual(resolver.getProjectName(), 'MyProject');
             assert.strictEqual(resolver.getVariable('PROJECT_NAME'), 'MyProject');
             assert.strictEqual(resolver.getVariable('CMAKE_PROJECT_NAME'), 'MyProject');
+        });
+
+        it('should update PROJECT_SOURCE_DIR to directory of project() command', () => {
+            const content = `project(ZoomProxy)`;
+            resolver.parseFileContent(content, '/project/android-client2/client-app-common/ZoomProxy/CMakeLists.txt');
+            assert.strictEqual(resolver.getVariable('PROJECT_SOURCE_DIR'), path.dirname('/project/android-client2/client-app-common/ZoomProxy/CMakeLists.txt'));
+        });
+
+        it('should resolve set with ../.. relative to PROJECT_SOURCE_DIR from project()', () => {
+            const content = 'project(ZoomProxy)\nset(WORKSPACE_PATH "${PROJECT_SOURCE_DIR}/../..")';
+            resolver.parseFileContent(content, '/project/android-client2/sub1/sub2/CMakeLists.txt');
+            assert.strictEqual(resolver.getVariable('WORKSPACE_PATH'), '/project/android-client2');
         });
 
         it('should update CMAKE_CURRENT_SOURCE_DIR', () => {
