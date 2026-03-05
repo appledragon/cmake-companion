@@ -104,11 +104,12 @@ export class CMakeDefinitionProvider implements vscode.DefinitionProvider {
         variableName: string
     ): vscode.Location | null {
         const text = document.getText();
+        const escaped = variableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
         // Match: set(VAR_NAME or option(VAR_NAME
         const patterns = [
-            new RegExp(`^\\s*set\\s*\\(\\s*(${variableName})\\b`, 'gim'),
-            new RegExp(`^\\s*option\\s*\\(\\s*(${variableName})\\b`, 'gim'),
+            new RegExp(`^\\s*set\\s*\\(\\s*(${escaped})\\b`, 'gim'),
+            new RegExp(`^\\s*option\\s*\\(\\s*(${escaped})\\b`, 'gim'),
         ];
         
         for (const pattern of patterns) {

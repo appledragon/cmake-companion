@@ -11,15 +11,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseVariables, parsePaths } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
-import { isBuiltInVariable, BUILTIN_VARIABLE_PREFIXES, BUILTIN_VARIABLES } from '../utils/cmakeBuiltins';
-import { BLOCK_PAIRS, DEPRECATED_COMMANDS } from '../utils/diagnosticUtils';
-
-interface BlockInfo {
-    type: 'start' | 'end';
-    name: string;
-    line: number;
-    pairName: string;
-}
+import { isBuiltInVariable } from '../utils/cmakeBuiltins';
+import { findUnmatchedBlocks, findDeprecatedCommands } from '../utils/diagnosticUtils';
 
 export class CMakeDiagnosticProvider implements vscode.Disposable {
     private diagnosticCollection: vscode.DiagnosticCollection;
@@ -165,8 +158,13 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
         
         // Also collect function/macro arguments
         const funcRegex = /^\s*(?:function|macro)\s*\(\s*\w+\s+([^)]+)\)/gim;
-        while ((funcRegex.exec(text)) !== null) {
-            // Arguments are seen as defined within the function
+        let funcMatch;
+        while ((funcMatch = funcRegex.exec(text)) !== null) {
+            for (const arg of funcMatch[1].trim().split(/\s+/)) {
+                if (arg) {
+                    seenVariables.add(arg);
+                }
+            }
         }
         
         // Also collect foreach loop variables
@@ -216,85 +214,17 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
         text: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
-        const lines = text.split('\n');
-        const blocks: BlockInfo[] = [];
+        const errors = findUnmatchedBlocks(text);
         
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            const line = lines[lineIndex].toLowerCase().trim();
-            if (!line || line.startsWith('#')) {
-                continue;
-            }
+        for (const error of errors) {
+            const line = document.lineAt(error.line);
+            const message = error.type === 'missing-end'
+                ? `Unmatched '${error.blockName}' - missing '${error.expectedPair}'`
+                : `Unmatched '${error.blockName}' - missing '${error.expectedPair}'`;
             
-            for (const pair of BLOCK_PAIRS) {
-                // Check for start of block
-                const startRegex = new RegExp(`^${pair.start}\\s*\\(`);
-                if (startRegex.test(line)) {
-                    blocks.push({
-                        type: 'start',
-                        name: pair.start,
-                        line: lineIndex,
-                        pairName: pair.name
-                    });
-                }
-                
-                // Check for end of block
-                const endRegex = new RegExp(`^${pair.end}\\s*\\(`);
-                if (endRegex.test(line)) {
-                    blocks.push({
-                        type: 'end',
-                        name: pair.end,
-                        line: lineIndex,
-                        pairName: pair.name
-                    });
-                }
-            }
-        }
-        
-        // Match blocks using a stack
-        const stack: BlockInfo[] = [];
-        const unmatchedEnds: BlockInfo[] = [];
-        
-        for (const block of blocks) {
-            if (block.type === 'start') {
-                stack.push(block);
-            } else {
-                // Find matching start
-                const pair = BLOCK_PAIRS.find(p => p.end === block.name);
-                if (pair) {
-                    let found = false;
-                    for (let i = stack.length - 1; i >= 0; i--) {
-                        if (stack[i].name === pair.start) {
-                            stack.splice(i, 1);
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        unmatchedEnds.push(block);
-                    }
-                }
-            }
-        }
-        
-        // Report unmatched starts
-        for (const block of stack) {
-            const line = document.lineAt(block.line);
             const diagnostic = new vscode.Diagnostic(
                 line.range,
-                `Unmatched '${block.name}' - missing '${BLOCK_PAIRS.find(p => p.start === block.name)?.end}'`,
-                vscode.DiagnosticSeverity.Error
-            );
-            diagnostic.source = 'cmake';
-            diagnostic.code = 'unmatched-block';
-            diagnostics.push(diagnostic);
-        }
-        
-        // Report unmatched ends
-        for (const block of unmatchedEnds) {
-            const line = document.lineAt(block.line);
-            const diagnostic = new vscode.Diagnostic(
-                line.range,
-                `Unmatched '${block.name}' - missing '${BLOCK_PAIRS.find(p => p.end === block.name)?.start}'`,
+                message,
                 vscode.DiagnosticSeverity.Error
             );
             diagnostic.source = 'cmake';
@@ -311,39 +241,36 @@ export class CMakeDiagnosticProvider implements vscode.Disposable {
         text: string,
         diagnostics: vscode.Diagnostic[]
     ): void {
-        const lines = text.split('\n');
+        const deprecatedResults = findDeprecatedCommands(text);
         
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            const line = lines[lineIndex];
-            const trimmed = line.trim().toLowerCase();
+        for (const result of deprecatedResults) {
+            const line = document.lineAt(result.line);
+            // Find the command position in the line
+            const lineText = line.text;
+            const cmdRegex = new RegExp(`^\\s*(${result.command})\\s*\\(`, 'i');
+            const match = cmdRegex.exec(lineText);
             
-            if (trimmed.startsWith('#')) {
-                continue;
+            let range: vscode.Range;
+            if (match) {
+                const startChar = match.index + (match[0].length - match[1].length - 2);
+                const endChar = startChar + match[1].length;
+                range = new vscode.Range(
+                    new vscode.Position(result.line, startChar),
+                    new vscode.Position(result.line, endChar)
+                );
+            } else {
+                range = line.range;
             }
             
-            for (const [deprecated, replacement] of DEPRECATED_COMMANDS) {
-                const regex = new RegExp(`^\\s*(${deprecated})\\s*\\(`, 'i');
-                const match = regex.exec(line);
-                
-                if (match) {
-                    const startChar = match.index + (match[0].length - match[1].length - 2);
-                    const endChar = startChar + match[1].length;
-                    const range = new vscode.Range(
-                        new vscode.Position(lineIndex, startChar),
-                        new vscode.Position(lineIndex, endChar)
-                    );
-                    
-                    const diagnostic = new vscode.Diagnostic(
-                        range,
-                        `'${match[1]}' is deprecated. Consider using '${replacement}' instead.`,
-                        vscode.DiagnosticSeverity.Hint
-                    );
-                    diagnostic.source = 'cmake';
-                    diagnostic.code = 'deprecated-command';
-                    diagnostic.tags = [vscode.DiagnosticTag.Deprecated];
-                    diagnostics.push(diagnostic);
-                }
-            }
+            const diagnostic = new vscode.Diagnostic(
+                range,
+                `'${result.command}' is deprecated. Consider using '${result.replacement}' instead.`,
+                vscode.DiagnosticSeverity.Hint
+            );
+            diagnostic.source = 'cmake';
+            diagnostic.code = 'deprecated-command';
+            diagnostic.tags = [vscode.DiagnosticTag.Deprecated];
+            diagnostics.push(diagnostic);
         }
     }
     

@@ -5,6 +5,7 @@
 
 import { VcxprojProject } from './vcxprojParser';
 import { XcodeprojProject } from './xcodeprojParser';
+import { uniqueArray } from '../utils/arrayUtils';
 
 /**
  * Generate CMakeLists.txt content from vcxproj project data
@@ -599,13 +600,7 @@ function collectLinkOptionsFromConfig(settings: NonNullable<VcxprojProject['conf
 }
 
 function uniqueOptions(options: string[]): string[] {
-    const unique: string[] = [];
-    for (const opt of options) {
-        if (!unique.includes(opt)) {
-            unique.push(opt);
-        }
-    }
-    return unique;
+    return uniqueArray(options);
 }
 
 function mapOptimizationToFlag(value: string): string | undefined {

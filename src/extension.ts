@@ -166,7 +166,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         'cmake-companion.internal.refreshDecorations',
         () => {
             // Trigger re-validation of open documents
-            // This will cause the providers to re-evaluate
+            const diagnosticProvider = getDiagnosticProvider();
+            for (const document of vscode.workspace.textDocuments) {
+                if (isCMakeFile(document)) {
+                    diagnosticProvider.updateDiagnostics(document);
+                }
+            }
         }
     );
     context.subscriptions.push(internalRefreshCommand);

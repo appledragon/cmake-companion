@@ -2,6 +2,7 @@
  * Utils module index
  */
 
+export * from './arrayUtils';
 export * from './cmakeBuiltins';
 export * from './completionUtils';
 export * from './definitionUtils';

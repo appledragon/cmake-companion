@@ -13,6 +13,8 @@
  * - PBXFileReference: References to files in the project
  */
 
+import { mergeUnique as mergeUniqueUtil } from '../utils/arrayUtils';
+
 /**
  * Shell script build phase (Run Script phase in Xcode)
  */
@@ -923,13 +925,7 @@ function parseCopyFilesPhase(phase: string, objects: Record<string, string>): Co
  * @returns Merged array with unique values
  */
 function mergeUnique(arr1: string[], arr2: string[]): string[] {
-    const result = [...arr1];
-    for (const item of arr2) {
-        if (!result.includes(item)) {
-            result.push(item);
-        }
-    }
-    return result;
+    return mergeUniqueUtil(arr1, arr2);
 }
 
 /**

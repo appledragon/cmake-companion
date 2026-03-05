@@ -7,6 +7,7 @@
 import * as vscode from 'vscode';
 import { parseVariables } from '../parsers';
 import { getVariableResolver } from '../services/variableResolver';
+import { isBuiltInVariable } from '../utils/cmakeBuiltins';
 
 /**
  * Token types for semantic highlighting
@@ -178,7 +179,7 @@ export class CMakeSemanticTokensProvider implements vscode.DocumentSemanticToken
             // false positives for variables defined in included files not yet parsed
             
             // Check if it's a built-in CMake variable
-            if (this.isBuiltInVariable(match.variableName)) {
+            if (isBuiltInVariable(match.variableName)) {
                 modifiers.push('defaultLibrary');
             }
             
@@ -192,16 +193,6 @@ export class CMakeSemanticTokensProvider implements vscode.DocumentSemanticToken
                 modifierBits
             );
         }
-    }
-    
-    /**
-     * Check if a variable is a built-in CMake variable
-     */
-    private isBuiltInVariable(name: string): boolean {
-        const builtInPrefixes = [
-            'CMAKE_', 'PROJECT_', 'CTEST_', 'CPACK_'
-        ];
-        return builtInPrefixes.some(prefix => name.startsWith(prefix));
     }
     
     /**

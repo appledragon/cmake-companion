@@ -29,6 +29,24 @@ export const DEPRECATED_COMMANDS: Map<string, string> = new Map([
     ['add_compile_options', 'target_compile_options (for target-specific)'],
 ]);
 
+/**
+ * Pre-compiled regex patterns for block matching
+ */
+const BLOCK_REGEXES = BLOCK_PAIRS.map(pair => ({
+    start: new RegExp(`^${pair.start}\\s*\\(`),
+    end: new RegExp(`^${pair.end}\\s*\\(`),
+    pair
+}));
+
+/**
+ * Pre-compiled regex patterns for deprecated commands
+ */
+const DEPRECATED_REGEXES = Array.from(DEPRECATED_COMMANDS.entries()).map(([cmd, replacement]) => ({
+    regex: new RegExp(`^\\s*${cmd}\\s*\\(`, 'i'),
+    command: cmd,
+    replacement
+}));
+
 export interface UndefinedVariableInfo {
     name: string;
     startIndex: number;
@@ -70,6 +88,17 @@ export function findUndefinedVariables(
     const foreachRegex = /^\s*foreach\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)/gim;
     while ((match = foreachRegex.exec(text)) !== null) {
         localVars.add(match[1]);
+    }
+
+    // Collect function/macro arguments
+    const funcRegex = /^\s*(?:function|macro)\s*\(\s*\w+\s+([^)]+)\)/gim;
+    let funcMatch;
+    while ((funcMatch = funcRegex.exec(text)) !== null) {
+        for (const arg of funcMatch[1].trim().split(/\s+/)) {
+            if (arg) {
+                localVars.add(arg);
+            }
+        }
     }
 
     for (const variable of variables) {
@@ -118,15 +147,13 @@ export function findUnmatchedBlocks(text: string): BlockError[] {
             continue;
         }
 
-        for (const pair of BLOCK_PAIRS) {
-            const startRegex = new RegExp(`^${pair.start}\\s*\\(`);
-            if (startRegex.test(line)) {
-                blocks.push({ type: 'start', name: pair.start, line: lineIndex });
+        for (const blockRegex of BLOCK_REGEXES) {
+            if (blockRegex.start.test(line)) {
+                blocks.push({ type: 'start', name: blockRegex.pair.start, line: lineIndex });
             }
 
-            const endRegex = new RegExp(`^${pair.end}\\s*\\(`);
-            if (endRegex.test(line)) {
-                blocks.push({ type: 'end', name: pair.end, line: lineIndex });
+            if (blockRegex.end.test(line)) {
+                blocks.push({ type: 'end', name: blockRegex.pair.end, line: lineIndex });
             }
         }
     }
@@ -196,13 +223,12 @@ export function findDeprecatedCommands(text: string): DeprecatedCommandInfo[] {
             continue;
         }
 
-        for (const [cmd, replacement] of DEPRECATED_COMMANDS) {
-            const regex = new RegExp(`^\\s*${cmd}\\s*\\(`, 'i');
-            if (regex.test(line)) {
+        for (const dep of DEPRECATED_REGEXES) {
+            if (dep.regex.test(line)) {
                 deprecated.push({
                     line: lineIndex,
-                    command: cmd,
-                    replacement
+                    command: dep.command,
+                    replacement: dep.replacement
                 });
             }
         }

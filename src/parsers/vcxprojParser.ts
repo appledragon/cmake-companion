@@ -3,6 +3,8 @@
  * Parses .vcxproj files to extract project configuration for CMake conversion
  */
 
+import { mergeUnique } from '../utils/arrayUtils';
+
 /**
  * Precompiled header configuration
  */
@@ -687,13 +689,7 @@ function parseAdditionalOptionsValue(value: string, macroToSkip: string): string
  * @returns Merged list
  */
 function mergeUniqueStrings(existing: string[] | undefined, incoming: string[]): string[] {
-    const merged = existing ? [...existing] : [];
-    for (const item of incoming) {
-        if (!merged.includes(item)) {
-            merged.push(item);
-        }
-    }
-    return merged;
+    return mergeUnique(existing, incoming);
 }
 
 /**

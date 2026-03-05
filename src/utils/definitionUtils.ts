@@ -4,6 +4,13 @@
  */
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Variable reference with position information
  */
 export interface VariableReference {
@@ -18,11 +25,12 @@ export interface VariableReference {
  */
 export function findVariableDefinitionLine(text: string, variableName: string): number {
     const lines = text.split('\n');
+    const escaped = escapeRegExp(variableName);
     
     // Patterns for set() and option() commands
     const patterns = [
-        new RegExp(`^\\s*set\\s*\\(\\s*(${variableName})\\b`, 'i'),
-        new RegExp(`^\\s*option\\s*\\(\\s*(${variableName})\\b`, 'i'),
+        new RegExp(`^\\s*set\\s*\\(\\s*(${escaped})\\b`, 'i'),
+        new RegExp(`^\\s*option\\s*\\(\\s*(${escaped})\\b`, 'i'),
     ];
     
     for (let i = 0; i < lines.length; i++) {
