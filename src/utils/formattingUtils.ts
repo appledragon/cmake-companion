@@ -6,7 +6,7 @@
 /**
  * Supported formatting style presets
  */
-export type CMakeFormattingStyle = 'default' | 'google';
+export type CMakeFormattingStyle = 'default' | 'google' | 'llvm' | 'mozilla' | 'microsoft' | 'gnu' | 'webkit' | 'kde';
 
 /**
  * Formatting options for CMake files
@@ -24,6 +24,8 @@ export interface CMakeFormattingOptions {
     spaceBeforeCloseParen: boolean;
     /** Uppercase command names */
     uppercaseCommands: boolean;
+    /** When wrapping, put closing ')' on its own line (true) or after the last argument (false) */
+    danglingParenthesis: boolean;
 }
 
 /**
@@ -35,11 +37,13 @@ export const DEFAULT_OPTIONS: CMakeFormattingOptions = {
     maxLineLength: 0,
     spaceAfterOpenParen: false,
     spaceBeforeCloseParen: false,
-    uppercaseCommands: false
+    uppercaseCommands: false,
+    danglingParenthesis: true
 };
 
 /**
  * Google-style formatting options
+ * Lowercase commands, 2-space indent, 80-char line, dangling paren
  */
 export const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
     tabSize: 2,
@@ -47,7 +51,92 @@ export const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
     maxLineLength: 80,
     spaceAfterOpenParen: false,
     spaceBeforeCloseParen: false,
-    uppercaseCommands: false
+    uppercaseCommands: false,
+    danglingParenthesis: true
+};
+
+/**
+ * LLVM-style formatting options
+ * Lowercase commands, 2-space indent, 80-char line, no dangling paren
+ */
+export const LLVM_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 80,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false,
+    danglingParenthesis: false
+};
+
+/**
+ * Mozilla-style formatting options
+ * Lowercase commands, 2-space indent, no line limit, no dangling paren
+ */
+export const MOZILLA_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 0,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false,
+    danglingParenthesis: false
+};
+
+/**
+ * Microsoft-style formatting options
+ * Uppercase commands, 4-space indent, 120-char line, dangling paren
+ */
+export const MICROSOFT_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 4,
+    insertSpaces: true,
+    maxLineLength: 120,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: true,
+    danglingParenthesis: true
+};
+
+/**
+ * GNU-style formatting options
+ * Uppercase commands, 2-space indent, no line limit, spaces inside parens
+ */
+export const GNU_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 2,
+    insertSpaces: true,
+    maxLineLength: 0,
+    spaceAfterOpenParen: true,
+    spaceBeforeCloseParen: true,
+    uppercaseCommands: true,
+    danglingParenthesis: true
+};
+
+/**
+ * WebKit-style formatting options
+ * Lowercase commands, 4-space indent, no line limit, no dangling paren
+ */
+export const WEBKIT_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 4,
+    insertSpaces: true,
+    maxLineLength: 0,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false,
+    danglingParenthesis: false
+};
+
+/**
+ * KDE-style formatting options
+ * Lowercase commands, 4-space indent, 80-char line, dangling paren
+ */
+export const KDE_STYLE_OPTIONS: CMakeFormattingOptions = {
+    tabSize: 4,
+    insertSpaces: true,
+    maxLineLength: 80,
+    spaceAfterOpenParen: false,
+    spaceBeforeCloseParen: false,
+    uppercaseCommands: false,
+    danglingParenthesis: true
 };
 
 /**
@@ -55,7 +144,13 @@ export const GOOGLE_STYLE_OPTIONS: CMakeFormattingOptions = {
  */
 export const STYLE_PRESETS: Record<CMakeFormattingStyle, CMakeFormattingOptions> = {
     'default': DEFAULT_OPTIONS,
-    'google': GOOGLE_STYLE_OPTIONS
+    'google': GOOGLE_STYLE_OPTIONS,
+    'llvm': LLVM_STYLE_OPTIONS,
+    'mozilla': MOZILLA_STYLE_OPTIONS,
+    'microsoft': MICROSOFT_STYLE_OPTIONS,
+    'gnu': GNU_STYLE_OPTIONS,
+    'webkit': WEBKIT_STYLE_OPTIONS,
+    'kde': KDE_STYLE_OPTIONS
 };
 
 /**
@@ -241,10 +336,19 @@ export function wrapLineIfNeeded(
     const wrapped: string[] = [];
 
     wrapped.push(`${baseIndent}${command}(`);
-    for (const arg of args) {
-        wrapped.push(`${continuationIndent}${arg}`);
+    if (options.danglingParenthesis) {
+        // Dangling style: each arg on its own line, ')' on a separate line
+        for (const arg of args) {
+            wrapped.push(`${continuationIndent}${arg}`);
+        }
+        wrapped.push(`${baseIndent})`);
+    } else {
+        // Compact style: each arg on its own line, ')' after the last arg
+        for (let i = 0; i < args.length - 1; i++) {
+            wrapped.push(`${continuationIndent}${args[i]}`);
+        }
+        wrapped.push(`${continuationIndent}${args[args.length - 1]})`); 
     }
-    wrapped.push(`${baseIndent})`);
 
     return wrapped;
 }

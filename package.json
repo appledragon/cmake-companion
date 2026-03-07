@@ -82,10 +82,26 @@
           "type": "string",
           "enum": [
             "default",
-            "google"
+            "google",
+            "llvm",
+            "mozilla",
+            "microsoft",
+            "gnu",
+            "webkit",
+            "kde"
+          ],
+          "enumDescriptions": [
+            "Default style: lowercase commands, 2-space indent, no line length limit",
+            "Google style: lowercase commands, 2-space indent, 80-char line limit, dangling parenthesis",
+            "LLVM style: lowercase commands, 2-space indent, 80-char line limit, compact parenthesis",
+            "Mozilla style: lowercase commands, 2-space indent, no line length limit, compact parenthesis",
+            "Microsoft style: UPPERCASE commands, 4-space indent, 120-char line limit, dangling parenthesis",
+            "GNU style: UPPERCASE commands, 2-space indent, no line length limit, spaces inside parentheses",
+            "WebKit style: lowercase commands, 4-space indent, no line length limit, compact parenthesis",
+            "KDE style: lowercase commands, 4-space indent, 80-char line limit, dangling parenthesis"
           ],
           "default": "google",
-          "description": "Formatting style preset. 'google' style uses lowercase commands, 2-space indentation, no spaces inside parentheses, and 80 character line length (similar to clang-format's Google style)"
+          "description": "Formatting style preset (similar to clang-format styles). Individual settings below can override the preset values."
         },
         "cmake-companion.formatting.maxLineLength": {
           "type": "number",
@@ -102,6 +118,10 @@
         "cmake-companion.formatting.uppercaseCommands": {
           "type": "boolean",
           "description": "Convert CMake command names to uppercase. Overrides the style preset value when set."
+        },
+        "cmake-companion.formatting.danglingParenthesis": {
+          "type": "boolean",
+          "description": "When wrapping long lines, put the closing ')' on its own line (true) or after the last argument (false). Overrides the style preset value when set."
         },
         "cmake-companion.diagnostics.enabled": {
           "type": "boolean",

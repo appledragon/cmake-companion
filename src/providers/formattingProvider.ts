@@ -13,12 +13,6 @@ import {
     INDENT_DECREASE_COMMANDS,
     formatLine,
     wrapLineIfNeeded,
-    createIndent,
-    formatCommand,
-    formatParentheses,
-    normalizeWhitespace,
-    splitArguments,
-    containsCommentOutsideString,
     getIndentation
 } from '../utils/formattingUtils';
 
@@ -118,7 +112,8 @@ export class CMakeDocumentFormattingProvider implements vscode.DocumentFormattin
             maxLineLength: config.get<number>('formatting.maxLineLength') ?? baseOptions.maxLineLength,
             spaceAfterOpenParen: config.get<boolean>('formatting.spaceAfterOpenParen') ?? baseOptions.spaceAfterOpenParen,
             spaceBeforeCloseParen: config.get<boolean>('formatting.spaceBeforeCloseParen') ?? baseOptions.spaceBeforeCloseParen,
-            uppercaseCommands: config.get<boolean>('formatting.uppercaseCommands') ?? baseOptions.uppercaseCommands
+            uppercaseCommands: config.get<boolean>('formatting.uppercaseCommands') ?? baseOptions.uppercaseCommands,
+            danglingParenthesis: config.get<boolean>('formatting.danglingParenthesis') ?? baseOptions.danglingParenthesis
         };
     }
     

@@ -7,6 +7,13 @@ import {
     CMakeFormattingOptions,
     DEFAULT_OPTIONS,
     GOOGLE_STYLE_OPTIONS,
+    LLVM_STYLE_OPTIONS,
+    MOZILLA_STYLE_OPTIONS,
+    MICROSOFT_STYLE_OPTIONS,
+    GNU_STYLE_OPTIONS,
+    WEBKIT_STYLE_OPTIONS,
+    KDE_STYLE_OPTIONS,
+    STYLE_PRESETS,
     INDENT_INCREASE_COMMANDS,
     INDENT_DECREASE_COMMANDS,
     createIndent,
@@ -46,6 +53,57 @@ describe('CMake Formatting Logic', () => {
             assert.strictEqual(DEFAULT_OPTIONS.tabSize, GOOGLE_STYLE_OPTIONS.tabSize);
             assert.strictEqual(DEFAULT_OPTIONS.insertSpaces, GOOGLE_STYLE_OPTIONS.insertSpaces);
             assert.notStrictEqual(DEFAULT_OPTIONS.maxLineLength, GOOGLE_STYLE_OPTIONS.maxLineLength);
+        });
+
+        it('should have correct LLVM style options', () => {
+            assert.strictEqual(LLVM_STYLE_OPTIONS.tabSize, 2);
+            assert.strictEqual(LLVM_STYLE_OPTIONS.maxLineLength, 80);
+            assert.strictEqual(LLVM_STYLE_OPTIONS.uppercaseCommands, false);
+            assert.strictEqual(LLVM_STYLE_OPTIONS.danglingParenthesis, false);
+        });
+
+        it('should have correct Mozilla style options', () => {
+            assert.strictEqual(MOZILLA_STYLE_OPTIONS.tabSize, 2);
+            assert.strictEqual(MOZILLA_STYLE_OPTIONS.maxLineLength, 0);
+            assert.strictEqual(MOZILLA_STYLE_OPTIONS.uppercaseCommands, false);
+            assert.strictEqual(MOZILLA_STYLE_OPTIONS.danglingParenthesis, false);
+        });
+
+        it('should have correct Microsoft style options', () => {
+            assert.strictEqual(MICROSOFT_STYLE_OPTIONS.tabSize, 4);
+            assert.strictEqual(MICROSOFT_STYLE_OPTIONS.maxLineLength, 120);
+            assert.strictEqual(MICROSOFT_STYLE_OPTIONS.uppercaseCommands, true);
+            assert.strictEqual(MICROSOFT_STYLE_OPTIONS.danglingParenthesis, true);
+        });
+
+        it('should have correct GNU style options', () => {
+            assert.strictEqual(GNU_STYLE_OPTIONS.tabSize, 2);
+            assert.strictEqual(GNU_STYLE_OPTIONS.maxLineLength, 0);
+            assert.strictEqual(GNU_STYLE_OPTIONS.uppercaseCommands, true);
+            assert.strictEqual(GNU_STYLE_OPTIONS.spaceAfterOpenParen, true);
+            assert.strictEqual(GNU_STYLE_OPTIONS.spaceBeforeCloseParen, true);
+            assert.strictEqual(GNU_STYLE_OPTIONS.danglingParenthesis, true);
+        });
+
+        it('should have correct WebKit style options', () => {
+            assert.strictEqual(WEBKIT_STYLE_OPTIONS.tabSize, 4);
+            assert.strictEqual(WEBKIT_STYLE_OPTIONS.maxLineLength, 0);
+            assert.strictEqual(WEBKIT_STYLE_OPTIONS.uppercaseCommands, false);
+            assert.strictEqual(WEBKIT_STYLE_OPTIONS.danglingParenthesis, false);
+        });
+
+        it('should have correct KDE style options', () => {
+            assert.strictEqual(KDE_STYLE_OPTIONS.tabSize, 4);
+            assert.strictEqual(KDE_STYLE_OPTIONS.maxLineLength, 80);
+            assert.strictEqual(KDE_STYLE_OPTIONS.uppercaseCommands, false);
+            assert.strictEqual(KDE_STYLE_OPTIONS.danglingParenthesis, true);
+        });
+
+        it('should have all styles in STYLE_PRESETS', () => {
+            const expectedStyles = ['default', 'google', 'llvm', 'mozilla', 'microsoft', 'gnu', 'webkit', 'kde'];
+            for (const style of expectedStyles) {
+                assert.ok(STYLE_PRESETS[style as keyof typeof STYLE_PRESETS], `Missing style preset: ${style}`);
+            }
         });
     });
     
@@ -241,6 +299,25 @@ describe('CMake Formatting Logic', () => {
             assert.ok(result[result.length - 1].trim() === ')');
         });
 
+        it('should use compact style when danglingParenthesis is false', () => {
+            const compactOpts: CMakeFormattingOptions = { ...DEFAULT_OPTIONS, maxLineLength: 30, danglingParenthesis: false };
+            const result = wrapLineIfNeeded('target_link_libraries(myapp lib1 lib2 lib3)', 0, compactOpts);
+            assert.ok(result.length > 1);
+            assert.ok(result[0].includes('target_link_libraries('));
+            // Last line should end with ')' right after the last arg
+            const lastLine = result[result.length - 1].trim();
+            assert.ok(lastLine.endsWith(')'), `Expected last line to end with ')': ${lastLine}`);
+            assert.ok(lastLine !== ')', `Expected last line to contain an arg before ')': ${lastLine}`);
+        });
+
+        it('should use dangling style when danglingParenthesis is true', () => {
+            const danglingOpts: CMakeFormattingOptions = { ...DEFAULT_OPTIONS, maxLineLength: 30, danglingParenthesis: true };
+            const result = wrapLineIfNeeded('target_link_libraries(myapp lib1 lib2 lib3)', 0, danglingOpts);
+            assert.ok(result.length > 1);
+            // Last line should be just ')'
+            assert.strictEqual(result[result.length - 1].trim(), ')');
+        });
+
         it('should not wrap when maxLineLength is 0', () => {
             const result = wrapLineIfNeeded('very_long_command(arg1 arg2 arg3 arg4 arg5)', 0, DEFAULT_OPTIONS);
             assert.strictEqual(result.length, 1);
@@ -311,6 +388,34 @@ endif()`;
             const result = formatCMakeDocument(input, DEFAULT_OPTIONS);
             const lines = result.split('\n');
             assert.strictEqual(lines[1], '');
+        });
+
+        it('should format with Microsoft style (uppercase, 4-space indent)', () => {
+            const input = `if(WIN32)
+set(VAR value)
+endif()`;
+            const result = formatCMakeDocument(input, MICROSOFT_STYLE_OPTIONS);
+            const lines = result.split('\n');
+            assert.strictEqual(lines[0], 'IF(WIN32)');
+            assert.strictEqual(lines[1], '    SET(VAR value)');
+            assert.strictEqual(lines[2], 'ENDIF()');
+        });
+
+        it('should format with GNU style (uppercase, paren spaces)', () => {
+            const input = `set(VAR value)`;
+            const result = formatCMakeDocument(input, GNU_STYLE_OPTIONS);
+            assert.strictEqual(result, 'SET( VAR value )');
+        });
+
+        it('should format with KDE style (4-space indent)', () => {
+            const input = `if(condition)
+set(X 1)
+endif()`;
+            const result = formatCMakeDocument(input, KDE_STYLE_OPTIONS);
+            const lines = result.split('\n');
+            assert.strictEqual(lines[0], 'if(condition)');
+            assert.strictEqual(lines[1], '    set(X 1)');
+            assert.strictEqual(lines[2], 'endif()');
         });
     });
 });
