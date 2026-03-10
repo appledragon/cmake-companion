@@ -2,7 +2,7 @@
   "name": "cmake-companion",
   "displayName": "CMake Companion",
   "description": "Your intelligent CMake development companion - featuring path navigation, smart completions, formatting, diagnostics, and project conversion tools",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "appledragon",
   "icon": "icon.png",
   "engines": {
@@ -11,7 +11,7 @@
   "categories": [
     "Programming Languages",
     "Formatters",
-    "Other"
+    "Linters"
   ],
   "keywords": [
     "cmake",
